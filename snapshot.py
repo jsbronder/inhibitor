@@ -178,21 +178,20 @@ OPTIONAL ARGUMENTS:
         print "Error parsing commandline: %s" % e
 
     for o, a in sa:
-        o=o[1:]
-        if o == 'n':
+        if o in ('-n', '--name'):
             name = a
-        elif o == 's':
+        elif o in ('-s', '--source'):
             src = a
-        elif o == 't':
+        elif o in ('-t', '--type'):
             type = a
-        elif o == 'r':
+        elif o in ('-r', '--rev'):
             rev = a
-        elif o == 'f':
+        elif o in ('-f', '--force'):
             force = True
-        elif o == 'h':
+        elif o in ('-h', '--help'):
             print usage
             sys.exit(0)
-        elif o == 'c':
+        elif o in ('-c', '--config'):
             configfile = a
         else:
             import errno
