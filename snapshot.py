@@ -10,7 +10,7 @@ class InhibitorSnapshot(InhibitorObject):
     Manage a single snapshot such that catalyst will be happy with it.
     """
 
-    def __init__(self, name, src, type=None, rev=None, force=False, **keywords):
+    def __init__(self, name, src=None, type=None, rev=None, force=False, **keywords):
         super(InhibitorSnapshot, self).__init__(**keywords)
         self.name   = name
         self.src    = src
@@ -24,13 +24,28 @@ class InhibitorSnapshot(InhibitorObject):
         if catalyst_support:
             self.catalyst_snapcache = self.settings['base']['snapshot_cache']
             self.catalyst_snapshots = self.settings['base']['snapshots']
-            
-      
+        else:
+            self.catalyst_snapcache = None
+            self.catalyst_snapshots = None
+             
+     
+        if self.src == None:
+            try:
+                self.src = self.settings['snapshot'][self.name]['src']
+            except KeyError:
+                raise InhibitorError('Source for snapshot %s is undefined' % self.name)
+             
         if self.type == None:
-            if self.src.startswith('git://'):
-                self.type = 'git'
-            elif self.src.startswith('svn://'):
-                self.type = 'svn'
+            try:
+                self.type = self.settings['snapshot'][self.name]['type']
+            except KeyError:
+                if self.src.startswith('git://'):
+                    self.type = 'git'
+                elif self.src.startswith('svn://'):
+                    self.type = 'svn'
+                else:
+                    raise InhibitorError('Unable to parse upstream repository type for snapshot %s'
+                        % self.name)
 
         if not self.type in ['svn', 'git']:
             raise InhibitorError('Unknown snapshot src type:  \'%s\'' % self.src)
@@ -199,7 +214,7 @@ OPTIONAL ARGUMENTS:
             if a:
                str = "="+a 
             raise InhibitorError("Unknown option in command line '%s'%s" % (o, str))
-    if name == None or src == None or configfile == None:
+    if name == None or (src == None and configfile == None):
         raise InhibitorError("Both name (-n) and source (-s) must be defined.")
 
     InhibitorSnapshot(name, src, type=type, rev=rev, force=force, settings_file=configfile).run()
