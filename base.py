@@ -108,7 +108,7 @@ class InhibitorObject(object):
         root = s['root']
 
         dirs =[ 'snapshot_cache',   'snapshots',    'repo_cache',
-                'packages',         'builds' ]
+                'packages',         'builds',       'tmpdir'  ]
 
         for dir in dirs:
             self.set_kv( s, dir, os.path.join(root, dir) )

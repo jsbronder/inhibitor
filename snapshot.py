@@ -8,6 +8,9 @@ from base import InhibitorObject
 class InhibitorSnapshot(InhibitorObject):
     """
     Manage a single snapshot such that catalyst will be happy with it.
+
+    TODO:
+        - support git branches
     """
 
     def __init__(self, name, **keywords):

@@ -22,6 +22,13 @@ def stage1(s):
 def get_stage_settings(stage, s):
     s[stage] = {}
     s[stage]['catalyst_env'] = get_catalyst_env(s['system_type'])
+    s[stage]['portage_conf'] = get_portage_conf(stage)
+    s[stage]['portage'] = ('portage-cydonian', 'd294453')
+
+    if stage == 'stage4':
+        s[stage]['overlays'] = [ ('brontes3d', 'c385a8') ]
+        
+
 
 
 def get_catalyst_env(system_type):
@@ -54,7 +61,20 @@ export CXXFLAGS="${CFLAGS}"
 
     return catalyst_env
 
+def get_portage_conf(stage):
+    portage_conf = {}
+    if stage in ['stage1', 'stage2', 'stage3']:
+        portage_conf['keywords.base'] = """
+=sys-fs/udev-135*
+=sys-apps/sysvinit-2.86*
+=sys-apps/hal-0.5.11*
+=sys-fs/cryptsetup-1.0.6*
+=sys-apps/portage-2.1.6*
+"""
+    return portage_conf 
 
+
+        
 
 
 
