@@ -13,17 +13,17 @@ snapshot_db = {
  
 
 # self.base[]
-def base():
+def base(**keywords):
     return {
         'debug':    True,
         'verbose':  True,
         'catalyst_support': True,
-        'rootdir':  '/var/tmp/inhibitor/'
+        'rootdir':  '/var/tmp/inhibitor/',
     }
    
 # self.X[]
-def snapshot(name):
-   return snapshot_db[name]
+def snapshot(**keywords):
+    return snapshot_db[keywords['name']]
 
 # self.build[]
 def build_config(**keywords):

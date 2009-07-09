@@ -16,17 +16,16 @@ class InhibitorSnapshot(InhibitorObject):
     def __init__(self, name, **keywords):
         self.name = name
 
-        required_settings = [
-            ('snapshot',    ['type', 'src'], {'name':name})
-        ]
-
-        valid_settings = [
-            ('snapshot',    ['rev'], {'name':name})
-        ]
+        settings_conf = {
+            'snapshot': {
+                'required_keys':    ['type', 'src'],
+                'valid_keys':       ['rev'],
+                'init_args':        {'name':name}
+            }
+        }
 
         super(InhibitorSnapshot, self).__init__(
-            required_settings=required_settings,
-            valid_settings=valid_settings,
+            settings_conf=settings_conf,
             **keywords)
         
 

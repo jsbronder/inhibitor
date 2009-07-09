@@ -16,29 +16,32 @@ class InhibitorObject(object):
 
     Default preference order is environment > command line > keywords > settings
     """
-    def __init__(self, 
-        required_settings = [], valid_settings = [],
-        **keywords):
+    def __init__(self, settings_conf, **keywords):
 
-        self.required_settings = [ 
-            ('base',        ['rootdir'],  {}) 
-        ]
+        self.settings_conf = {
+            'base': {
+                'required_keys':    ['rootdir'],
+                'valid_keys':       ['verbose', 'debug', 'catalyst_support' ],
+                'init_args':        {}
+            }
+        }
 
-        self.valid_settings = [
-            ('base',        ['verbose', 'debug', 'catalyst_support' ], {})
-        ]
-       
-        self.required_settings.extend(required_settings)
-        self.valid_settings.extend(valid_settings)
-       
+        for sc, v in settings_conf.items():
+            if sc in self.settings_conf:
+                self.settings_conf[sc].required_keys.extend(v['required_keys'])
+                self.settings_conf[sc].valid_keys.extend(v['valid_keys'])
+                self.settings_conf[sc].init_args.update(v['init_args'])
+            else:
+                self.settings_conf[sc] = {}
+                self.settings_conf[sc].update(v)
+
         # Create the required dictionaries.
-        for tup in self.valid_settings:
+        for s in self.settings_conf:
             tmp = {}
-            setattr(self, tup[0], tmp)
+            setattr(self, s, tmp)
 
-       
         # Fill self.base{}
-        self.base['version'] = __version__
+        self.version = __version__
         self._load_external_settings(**keywords)
         if 'config_file' in keywords:
             self.load_config(keywords['config_file'])
@@ -79,12 +82,6 @@ class InhibitorObject(object):
                 if len(l) == 2:
                     self._dot_to_dict(key_val[0], key_val[1])
      
-        for k,v in keywords.items():
-            for name, keys, _ in self.valid_settings:
-                if k in keys:
-                    d = getattr(self, name)
-                    d[k] = v
-
     def _dot_to_dict(self, keystr, val, overwrite=False):
         """
         Translates keystr=a.b.c and sets self.a['b']['c'] = val
@@ -93,7 +90,10 @@ class InhibitorObject(object):
         l = keystr.split('.', 1)
         cur = dict = getattr(self, l[0])
         keys = l[1].split('.')
-       
+      
+        if not dict in self._vs_names:
+            raise InhibitorError('Got invalid settings dictionary name %s' % dict)
+
         unset = False
         for k in keys:
             if not k in dict:
@@ -107,7 +107,7 @@ class InhibitorObject(object):
     def _expand_base_settings(self):
         s = self.base
 
-        self.update_setting( s, 'root', os.path.join(s['rootdir'], __version__))
+        self.update_setting( s, 'root', os.path.join(s['rootdir'], self.version))
 
         dirs =[ 'snapshot_cache',   'snapshots',    'repo_cache',
                 'packages',         'builds',       'tmpdir'  ]
@@ -119,16 +119,15 @@ class InhibitorObject(object):
     def load_config(self, config_file):
         mod = __import__(config_file, globals(), locals())
 
-        for f_name,_,keywords in self.valid_settings:
+        for name,v in self.settings_conf.items():
             try:
-                f = getattr(mod, f_name)
+                f = getattr(mod, name)
             except AttributeError, e:
                 raise InhibitorError('Module %s does not have requested target %s: %s'
                     % (config_file, f_name, e))
 
-            new_settings = f(**keywords)
-
-            self.update_values(f_name, new_settings)
+            new_settings = f(**v['init_args'])
+            self.update_values(name, new_settings)
 
     def update_setting(self, dict, key, value, overwrite=False):
         """
@@ -147,14 +146,23 @@ class InhibitorObject(object):
             self.update_setting(o, k, v)
 
     def sanity(self):
-        for k,v,_ in self.required_settings:
-            try:
-                o = getattr(self, k)
-            except AttributeError:
-                raise InhibitorError('Settings for %s are undefined.' % k)
-            for key in v:
-                if not key in o:
-                    raise InhibitorError('Setting %s in %s is undefined.' % (v, k))
+        sane = True
+        
+        for name, v in self.settings_conf.items():
+            s = getattr(self, name)
+
+            for k in s:
+                if not (k in v['valid_keys'] or k in v['required_keys']):
+                    err('%s[%s] is not a valid setting' % (name, k))
+                    sane = False
+
+            for k in v['required_keys']:
+                if not k in s:
+                    err('Setting %s[%s] is undefined.' % (name, k))
+                    sane = False
+
+        if not sane:
+            raise InhibitorError('Bailing out due to invalid settings.')
 
 
 
