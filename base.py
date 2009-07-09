@@ -21,7 +21,7 @@ class InhibitorObject(object):
         self.settings_conf = {
             'base': {
                 'required_keys':    ['rootdir'],
-                'valid_keys':       ['verbose', 'debug', 'catalyst_support' ],
+                'valid_keys':       ['verbose', 'debug', 'catalyst_support', 'force' ],
                 'init_args':        {}
             }
         }
@@ -67,7 +67,12 @@ class InhibitorObject(object):
         Note:  You can only set string values in this way, there is no way to set
         a list or dict or boolean via this method.
         """
-       
+      
+        for k,v in keywords.items():
+            for name in self.settings_conf:
+                if k.startswith(name+'.'):
+                    self._dot_to_dict(k, v)
+            
         # Grab from the environment
         for s in os.environ:
             s = s.lower()
@@ -88,21 +93,15 @@ class InhibitorObject(object):
         self.a must already exist and be a dictionary.
         """
         l = keystr.split('.', 1)
-        cur = dict = getattr(self, l[0])
+        dict = getattr(self, l[0])
         keys = l[1].split('.')
       
-        if not dict in self.settings_conf
+        if not l[0] in self.settings_conf:
             raise InhibitorError('Got invalid settings dictionary name %s' % dict)
 
-        unset = False
         for k in keys:
-            if not k in dict:
-                dict[k] = {}
-                cur = dict[k]
-                unset = True
-
-        if blank or overwrite:
-            cur = val
+            if not k in dict or overwrite:
+                dict[k] = val
 
     def _expand_base_settings(self):
         s = self.base
@@ -113,7 +112,12 @@ class InhibitorObject(object):
                 'packages',         'builds',       'tmpdir'  ]
         
         for dir in dirs:
-            self.update_setting( s, dir, os.path.join(s['root'], dir) )
+            targ = os.path.join(s['root'], dir) 
+            self.update_setting( s, dir, targ )
+            if not os.path.isdir(targ):
+                if os.path.exists(targ):
+                    warn('%s is not a directory, removing' % targ)
+                os.makedirs(targ)
 
 
     def load_config(self, config_file):

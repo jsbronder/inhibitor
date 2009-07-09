@@ -33,27 +33,16 @@ class InhibitorSnapshot(InhibitorObject):
         self.snapdir        = self.base['snapshots']
         self.snapfile       = None
         self.type           = self.snapshot['type']
+        self.src            = self.snapshot['src']
+        self.force          = self.base['force']
 
-        if 'force' in keywords:
-            self.force = True
-        else:
-            self.force = False
-        
         if not 'rev' in self.snapshot:
             self.rev = None
         else:
-            self.rev            = self.snapshot['rev']
+            self.rev = self.snapshot['rev']
 
         if not self.type in ['svn', 'git']:
             raise InhibitorError('Unknown snapshot src type:  \'%s\'' % self.src)
-
-
-        for p in [self.repodir, self.snapdir]:
-            if not os.path.exists(p):
-                try:
-                    os.makedirs(p)
-                except OSError, e:
-                    raise InhibitorError('Cannot create path %s : %s' % (p, e))
 
     def run(self):
         if self.type == 'git':
@@ -188,13 +177,13 @@ OPTIONAL ARGUMENTS:
         if o in ('-n', '--name'):
             name = a
         elif o in ('-s', '--source'):
-            args['src'] = a
+            args['snapshot.src'] = a
         elif o in ('-t', '--type'):
-            args['type'] = a
+            args['snapshot.type'] = a
         elif o in ('-r', '--rev'):
-            args['rev'] = a
+            args['snapshot.rev'] = a
         elif o in ('-f', '--force'):
-            args['force'] = True
+            args['base.force'] = True
         elif o in ('-h', '--help'):
             print usage
             sys.exit(0)
