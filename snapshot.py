@@ -14,65 +14,47 @@ class InhibitorSnapshot(InhibitorObject):
     """
 
     def __init__(self, name, **keywords):
-        super(InhibitorSnapshot, self).__init__(**keywords)
-        
         self.name = name
 
-        if 'config_file' in keywords:
-            self.load_config('snapshot', keywords['config_file'])
-            me = self.settings['snapshots'][name]
-        else:
-            warn('No config file specified.')
-            me = {}
+        required_settings = [
+            ('snapshot',    ['type', 'src'], {'name':name})
+        ]
 
-        self.fill_setting('src', keywords, me)
-        self.fill_setting('type', keywords, me)
-        self.fill_setting('rev', keywords, me)
+        valid_settings = [
+            ('snapshot',    ['rev'], {'name':name})
+        ]
 
-        self.repodir        = os.path.join(self.settings['base']['repo_cache'] + name ) + '/'
-        self.snapdir        = self.settings['base']['snapshots']
+        super(InhibitorSnapshot, self).__init__(
+            required_settings=required_settings,
+            valid_settings=valid_settings,
+            **keywords)
+        
+
+        self.repodir        = os.path.join(self.base['repo_cache'] + name ) + '/'
+        self.snapdir        = self.base['snapshots']
         self.snapfile       = None
+        self.type           = self.snapshot['type']
 
-        if self.settings['base']['catalyst_support']:
-            self.catalyst_snapcache = self.settings['base']['snapshot_cache']
-            self.catalyst_snapshots = self.settings['base']['snapshots']
+        if 'force' in keywords:
+            self.force = True
         else:
-            self.catalyst_snapcache = None
-            self.catalyst_snapshots = None
-    
-        if not self.src:
-            raise InhibitorError('Source for snapshot %s is undefined' % self.name)
-             
-        if self.type == None:
-            if self.src.startswith('git://'):
-                self.type = 'git'
-            elif self.src.startswith('svn://'):
-                self.type = 'svn'
-            else:
-                raise InhibitorError('Unable to parse upstream repository type for snapshot %s'
-                    % self.name)
+            self.force = False
+        
+        if not 'rev' in self.snapshot:
+            self.rev = None
+        else:
+            self.rev            = self.snapshot['rev']
 
         if not self.type in ['svn', 'git']:
             raise InhibitorError('Unknown snapshot src type:  \'%s\'' % self.src)
 
 
-        for p in [self.repodir, self.snapdir, 
-            self.catalyst_snapshots, self.catalyst_snapcache]:
-            if p == None:
-                continue
+        for p in [self.repodir, self.snapdir]:
             if not os.path.exists(p):
                 try:
                     os.makedirs(p)
                 except OSError, e:
                     raise InhibitorError('Cannot create path %s : %s' % (p, e))
-
-    def fill_setting(self, key, keywords, settings, default=None):
-        if keywords and key in keywords:
-            setattr(self, key, keywords[key])
-        elif settings and key in settings:
-            setattr(self, key, settings[key])
-        else:
-            setattr(self, key, default)
 
     def run(self):
         if self.type == 'git':
@@ -80,15 +62,11 @@ class InhibitorSnapshot(InhibitorObject):
         elif self.type == 'svn':
             self._svn_create_snapshot()
 
-        if self.settings['base']['catalyst_support']:
-            self.catalyst_snapshot()
+        self.create_cachedir()
 
 
-    def catalyst_snapshot(self):
-        # Make a snapshot_cache that catalyst can handle.
-        # We don't know if this is portage or an overlay, so we symlink the dirs.
-        info('Creating catalyst-supporting layout.')
-        base_dir = os.path.join(self.catalyst_snapcache, '%s-%s' % (self.name, self.rev) )
+    def create_cachedir(self):
+        base_dir = os.path.join(self.base['snapshot_cache'], '%s-%s' % (self.name, self.rev) )
         if os.path.exists(base_dir):
             shutil.rmtree(base_dir)
         
@@ -96,7 +74,6 @@ class InhibitorSnapshot(InhibitorObject):
         os.symlink('overlay', os.path.join(base_dir, 'portage'))
 
         cmd('tar -xjpf %s -C %s/' % (self.snapfile, base_dir))
-        write_hashfile(base_dir, self.snapfile, {'md5':None}, dest_filename='catalyst-hash')
 
 
     def _git_create_snapshot(self):

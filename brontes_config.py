@@ -1,21 +1,53 @@
 from base_funcs import InhibitorError
 
-def snapshot(settings):
-    settings['snapshots'] = {
-        'brontes3d':{
-            'type': 'git',
-            'src':  'git://lex-bs.mmm.com/portage-overlay.git'
-        },
-        'portage-cydonian':{
-            'type': 'git',
-            'src':  'git://lex-bs.mmm.com/portage-cydonian.git'
-        }
+snapshot_db = {
+    'brontes3d':{
+        'type': 'git',
+        'src':  'git://lex-bs.mmm.com/portage-overlay.git'
+    },
+    'portage-cydonian':{
+        'type': 'git',
+        'src':  'git://lex-bs.mmm.com/portage-cydonian.git'
     }
+}
  
+
+# self.base[]
+def base():
+    return {
+        'debug':    True,
+        'verbose':  True,
+        'rootdir':  '/var/tmp/inhibitor/'
+    }
+   
+# self.X[]
+def snapshot(name):
+   return snapshot_db[name]
+
+# self.build[]
+def build_config(**keywords):
+    # Need build_name
+    # need base_name ? (caches)
+    return {
+        'snapshot':     ('portage-cydonian', 'revision'),
+        'overlays':     [ ('brontes3d', 'revision') ],
+        'profile':      'default/linux/amd64/2008.0/no-multilib',
+        'portage_conf': {},
+        'catalyst_env': "",
+#Potentially necessary
+        'arch':         ''
+    }
+# Left over
+#   source_subpath
+#   target stage
+#   version_stamp
+#   pre_fs_overlay, post_fs_overlay     (These shoudl just be scripts to run)
+
+
+
+
 def stage1(s):
     get_stage_settings('stage1', s)
-
-
 
 
 
