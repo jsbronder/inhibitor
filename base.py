@@ -91,7 +91,7 @@ class InhibitorObject(object):
         cur = dict = getattr(self, l[0])
         keys = l[1].split('.')
       
-        if not dict in self._vs_names:
+        if not dict in self.settings_conf
             raise InhibitorError('Got invalid settings dictionary name %s' % dict)
 
         unset = False
