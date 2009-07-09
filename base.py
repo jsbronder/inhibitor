@@ -25,7 +25,7 @@ class InhibitorObject(object):
         ]
 
         self.valid_settings = [
-            ('base',        ['verbose', 'debug' ], {})
+            ('base',        ['verbose', 'debug', 'catalyst_support' ], {})
         ]
        
         self.required_settings.extend(required_settings)

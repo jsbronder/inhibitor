@@ -74,6 +74,8 @@ class InhibitorSnapshot(InhibitorObject):
         os.symlink('overlay', os.path.join(base_dir, 'portage'))
 
         cmd('tar -xjpf %s -C %s/' % (self.snapfile, base_dir))
+        if 'catalyst_support' in self.base and self.base['catalyst_support']:
+            write_hashfile(base_dir, self.snapfile, {'md5':None}, dest_filename='catalyst-hash')
 
 
     def _git_create_snapshot(self):

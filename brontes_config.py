@@ -17,6 +17,7 @@ def base():
     return {
         'debug':    True,
         'verbose':  True,
+        'catalyst_support': True,
         'rootdir':  '/var/tmp/inhibitor/'
     }
    
