@@ -29,7 +29,7 @@ class InhibitorSnapshot(InhibitorObject):
             **keywords)
         
 
-        self.repodir        = os.path.join(self.base['repo_cache'] + name ) + '/'
+        self.repodir        = os.path.join(self.base['repo_cache'], name ) + '/'
         self.snapdir        = self.base['snapshots']
         self.snapfile       = None
         self.type           = self.snapshot['type']
