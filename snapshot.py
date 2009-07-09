@@ -34,7 +34,7 @@ class InhibitorSnapshot(InhibitorObject):
         self.snapfile       = None
         self.type           = self.snapshot['type']
         self.src            = self.snapshot['src']
-        self.force          = self.base['force']
+        self.force          = 'force' in self.base and self.base['force'] or False
 
         if not 'rev' in self.snapshot:
             self.rev = None
