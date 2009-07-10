@@ -105,11 +105,24 @@ class InhibitorObject(object):
 
     def _expand_base_settings(self):
         s = self.base
+                
+                'valid_keys':       ['verbose', 'debug', 'catalyst_support', 'force' ],
+
+        if not 'force' in self.base:
+            self.base['force'] = False
+        if not 'debug' in self.base:
+            self.base['debug'] = False
+        if not 'catalyst_support' in self.base:
+            self.base['catalyst_support'] = False
+
+        global inhibitor_debug = self.base['debug']
+        global catalyst_support = self.base['catalyst_support']
 
         self.update_setting( s, 'root', os.path.join(s['rootdir'], self.version))
 
         dirs =[ 'snapshot_cache',   'snapshots',    'repo_cache',
-                'packages',         'builds',       'tmpdir'  ]
+                'packages',         'builds',       'tmp',
+                'stage_cache' ]
         
         for dir in dirs:
             targ = os.path.join(s['root'], dir) 

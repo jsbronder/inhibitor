@@ -8,6 +8,7 @@ import sys
 import types
 
 catalyst_support = True
+inhibitor_debug = False
 
 def info(message):
     print "\001\033[0;32m\002*\001\033[0m\002 %s" % message
@@ -17,6 +18,10 @@ def warn(message):
 
 def err(message):
     print "\001\033[0;31m\002*\001\033[0m\002 %s" % message
+
+def dbg(message):
+    if inhibitor_debug:
+        print "\001\033[1;36m\002*\001\033[0m\002 %s" % message
 
 class InhibitorError(Exception):
     def __init__(self, message):
