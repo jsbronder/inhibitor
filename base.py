@@ -72,6 +72,8 @@ class InhibitorObject(object):
             for name in self.settings_conf:
                 if k.startswith(name+'.'):
                     self._dot_to_dict(k, v)
+                elif type(k) == types.TypeDict and k == name:
+                    setattr(self, name, k)
             
         # Grab from the environment
         for s in os.environ:
