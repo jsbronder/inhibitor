@@ -45,6 +45,19 @@ def build_config(**keywords):
 #   pre_fs_overlay, post_fs_overlay     (These shoudl just be scripts to run)
 
 
+stage1_portage_conf = {
+    'package.keywords/base':    """
+# See build.
+#=sys-apps/baselayout-2.0.0*
+#=sys-apps/openrc-0.4.2*
+=sys-fs/udev-135*
+=sys-apps/sysvinit-2.86*
+=sys-apps/hal-0.5.11*
+=sys-fs/cryptsetup-1.0.6*
+
+=sys-apps/portage-2.1.6*
+"""
+}
 
 
 def stage1(s):
