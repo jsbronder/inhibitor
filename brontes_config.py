@@ -1,13 +1,16 @@
 from base_funcs import InhibitorError
+import os
 
 snapshot_db = {
     'brontes3d':{
-        'type': 'git',
-        'src':  'git://lex-bs.mmm.com/portage-overlay.git'
+        'repo_type':'git',
+        'src':      'git://lex-bs.mmm.com/portage-overlay.git',
+        'type':     'overlay'
     },
     'portage-cydonian':{
-        'type': 'git',
-        'src':  'git://lex-bs.mmm.com/portage-cydonian.git'
+        'repo_type':'git',
+        'src':      'git://lex-bs.mmm.com/portage-cydonian.git',
+        'type':     'portage'
     }
 }
  
@@ -19,73 +22,44 @@ def base(**keywords):
         'verbose':  True,
         'catalyst_support': True,
         'rootdir':  '/var/tmp/inhibitor/',
+        'installdir':   os.getcwd()
     }
    
 # self.X[]
 def snapshot(**keywords):
     return snapshot_db[keywords['name']]
 
-# self.build[]
-def build_config(**keywords):
-    # Need build_name
-    # need base_name ? (caches)
-    return {
-        'snapshot':     ('portage-cydonian', 'revision'),
-        'overlays':     [ ('brontes3d', 'revision') ],
+def stage(system_type='', stage='', **keywords):
+    if 'cmdline' in keywords:
+        for setting in keywords['cmdline'].split():
+            name,value = setting.split('=')
+            if name == 'system_type':
+                system_type = value
+
+    ret = {
+        'snapshot':     ('portage-cydonian', 'd294453'),
+        'overlays':     [ ('brontes3d', 'brontes-restorative-2.0.1_rc3') ],
         'profile':      'default/linux/amd64/2008.0/no-multilib',
-        'portage_conf': {},
-        'catalyst_env': "",
-#Potentially necessary
-        'arch':         ''
+        'portage_conf': get_portage_conf(stage),
+        'make_conf':    get_make_conf(system_type),
+        'arch':         'amd64',
+        'seed':         'stage3-amd64-2009.01.09',
     }
 # Left over
-#   source_subpath
 #   target stage
 #   version_stamp
 #   pre_fs_overlay, post_fs_overlay     (These shoudl just be scripts to run)
+    return ret
 
-
-stage1_portage_conf = {
-    'package.keywords/base':    """
-# See build.
-#=sys-apps/baselayout-2.0.0*
-#=sys-apps/openrc-0.4.2*
-=sys-fs/udev-135*
-=sys-apps/sysvinit-2.86*
-=sys-apps/hal-0.5.11*
-=sys-fs/cryptsetup-1.0.6*
-
-=sys-apps/portage-2.1.6*
-"""
-}
-
-
-def stage1(s):
-    get_stage_settings('stage1', s)
-
-
-
-def get_stage_settings(stage, s):
-    s[stage] = {}
-    s[stage]['catalyst_env'] = get_catalyst_env(s['system_type'])
-    s[stage]['portage_conf'] = get_portage_conf(stage)
-    s[stage]['portage'] = ('portage-cydonian', 'd294453')
-
-    if stage == 'stage4':
-        s[stage]['overlays'] = [ ('brontes3d', 'c385a8') ]
-        
-
-
-
-def get_catalyst_env(system_type):
+def get_make_conf(system_type):
     if system_type == 'amd64':
         _cflags='-O2 -march=athlon64 -pipe -fomit-frame-pointer'
     elif system_type == 'core2':
         _cflags='-O2 -march=athlon64 -pipe -fomit-frame-pointer'
     else:
-        raise InhibitorException("Unknown system_type=='%s'" % settings['system_type'])
+        raise InhibitorError("Unknown system_type:  '%s'" % system_type)
 
-    catalyst_env = """
+    return """
 export GENTOO_MIRRORS="http://mirror.mmm.com/ http://gentoo.osuosl.org/ http://distfiles.gentoo.org/"
 export SYNC="rsync://lex-bs.mmm.com/portage-cydonian"
 export LINGUAS="en"
@@ -105,8 +79,6 @@ export CXXFLAGS="${CFLAGS}"
 # vim: ft=sh
     """ % _cflags
 
-    return catalyst_env
-
 def get_portage_conf(stage):
     portage_conf = {}
     if stage in ['stage1', 'stage2', 'stage3']:
@@ -118,21 +90,3 @@ def get_portage_conf(stage):
 =sys-apps/portage-2.1.6*
 """
     return portage_conf 
-
-
-        
-
-
-
-build_settings = {
-    'snapshots':{
-        'portage-cydonian':{
-            'rev':  'HEAD',
-            'dest': '/usr/portage'
-        }
-    },
-
-    'stage1': {
-        'seed': 'stage3-amd64-2009.01.09'
-    }
-}

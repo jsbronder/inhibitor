@@ -13,14 +13,14 @@ class InhibitorSnapshot(InhibitorObject):
         - support git branches
     """
 
-    def __init__(self, name, **keywords):
+    def __init__(self, name, rev=None, **keywords):
         self.name = name
 
         settings_conf = {
             'snapshot': {
-                'required_keys':    ['type', 'src'],
+                'required_keys':    ['repo_type', 'src', 'type'],
                 'valid_keys':       ['rev'],
-                'init_args':        {'name':name}
+                'config_init':      {'name':name}
             }
         }
 
@@ -28,38 +28,63 @@ class InhibitorSnapshot(InhibitorObject):
             settings_conf=settings_conf,
             **keywords)
         
-
-        self.repodir        = os.path.join(self.base['repo_cache'], name ) + '/'
+        self.repodir        = path_join(self.base['repo_cache'], name ) + '/'
         self.snapdir        = self.base['snapshots']
-        self.snapfile       = None
-        self.type           = self.snapshot['type']
         self.src            = self.snapshot['src']
+        self.type           = self.snapshot['type']
+        self.repo_type      = self.snapshot['repo_type']
         self.force          = 'force' in self.base and self.base['force'] or False
+        self.rev            = rev
+        self.snapfile       = None
 
-        if not 'rev' in self.snapshot:
-            self.rev = None
-        else:
+        if not self.rev and 'rev' in self.snapshot['rev']:
             self.rev = self.snapshot['rev']
 
-        if not self.type in ['svn', 'git']:
-            raise InhibitorError('Unknown snapshot src type:  \'%s\'' % self.src)
+        if self.rev:
+            self.snapfile = path_join(self.snapdir, '%s-%s.tar.bz2'
+                % (self.name, self.rev))
+
+
+        if not self.repo_type in ['svn', 'git']:
+            raise InhibitorError('Unknown snapshot src repo_type:  \'%s\'' % self.src)
+
+    def is_overlay(self):
+        return self.snapshot['type'] == 'overlay'
+
+    def cachedir(self):
+        return path_join(
+            self.base['snapshot_cache'],
+            '%s-%s' % (self.name, self.rev),
+            'tree')
+        
+
+    def current_cache(self):
+        if not self.rev or not self.snapfile:
+            return False
+       
+        if os.path.exists(self.snapfile) \
+            and os.path.isdir(self.cachedir()) \
+            and os.listdir(self.cachedir()):
+            return True
+
 
     def run(self):
-        if self.type == 'git':
+        if self.repo_type == 'git':
             self._git_create_snapshot()
-        elif self.type == 'svn':
+        elif self.repo_type == 'svn':
             self._svn_create_snapshot()
 
         self.create_cachedir()
 
 
     def create_cachedir(self):
-        base_dir = os.path.join(self.base['snapshot_cache'], '%s-%s' % (self.name, self.rev) )
+        base_dir = path_join(self.base['snapshot_cache'], '%s-%s' % (self.name, self.rev) )
         if os.path.exists(base_dir):
             shutil.rmtree(base_dir)
         
         os.makedirs(base_dir)
-        os.symlink('overlay', os.path.join(base_dir, 'portage'))
+        os.symlink('tree', path_join(base_dir, 'portage'))
+        os.symlink('tree', path_join(base_dir, 'overlay'))
 
         cmd('tar -xjpf %s -C %s/' % (self.snapfile, base_dir))
         if 'catalyst_support' in self.base and self.base['catalyst_support']:
@@ -67,7 +92,7 @@ class InhibitorSnapshot(InhibitorObject):
 
 
     def _git_create_snapshot(self):
-        myenv={'GIT_DIR':os.path.join(self.repodir, '.git')}
+        myenv={'GIT_DIR':path_join(self.repodir, '.git')}
 
         if not os.path.isdir( myenv['GIT_DIR'] ):
             if os.path.exists(self.repodir):
@@ -82,13 +107,12 @@ class InhibitorSnapshot(InhibitorObject):
             cmd('git pull', env=myenv)
 
         if self.rev == None:
-            self.rev = file_getline( os.path.join(myenv['GIT_DIR'], 'refs', 'heads', 'master') )
+            self.rev = file_getline( path_join(myenv['GIT_DIR'], 'refs', 'heads', 'master') )
             self.rev = self.rev[:7]
+            self.snapfile = path_join(self.snapdir, '%s-%s.tar.bz2'
+                % (self.name, self.rev))
 
-        self.snapfile = os.path.join(self.snapdir, '%s-%s.tar.bz2'
-            % (self.name, self.rev))
-
-        if not self.force and os.path.exists( self.snapfile ):
+        if not self.force and self.current_cache():
             info('Skipping archive step, %s already exists' % os.path.basename(self.snapfile))
             return
 
@@ -98,7 +122,7 @@ class InhibitorSnapshot(InhibitorObject):
             except OSError, e:
                 raise InhibitorError("Failed to remove %s: %s" % (self.snapfile, e))
                 
-        cmd('git archive --format=tar --prefix=overlay/ %s | bzip2 --fast -f > %s'
+        cmd('git archive --format=tar --prefix=tree/ %s | bzip2 --fast -f > %s'
             % (self.rev, self.snapfile), env=myenv)
       
         md5_hash = get_checksum(self.snapfile)
@@ -106,7 +130,7 @@ class InhibitorSnapshot(InhibitorObject):
 
 
     def _svn_create_snapshot(self):
-        svndir = os.path.join(self.repodir, '.svn')
+        svndir = path_join(self.repodir, '.svn')
         if not os.path.isdir(svndir):
             if os.path.exists(self.repodir):
                 warn('%s is not a svn repository.  Removing.' % self.repodir)
@@ -120,19 +144,18 @@ class InhibitorSnapshot(InhibitorObject):
             cmd('svn up %s' % (self.repodir))
             self.rev = cmd_out("svn info %s | awk '/Revision/{print $2}'" % self.repodir)
             self.rev = 'r' + self.rev
+            self.snapfile = path_join(self.snapdir, '%s-%s.tar.bz2'
+                % (self.name, self.rev))
         else:
             if self.rev[0] != 'r':
                 self.rev = 'r' + self.rev
             cmd('svn up -%s %s' % (self.rev, self.repodir))
 
-        self.snapfile = os.path.join(self.snapdir, '%s-%s.tar.bz2'
-            % (self.name, self.rev))
-
-        if not self.force and os.path.exists( self.snapfile ):
+        if not self.force and self.current_cache():
             info('Skipping archive step, %s already exists' % os.path.basename(self.snapfile))
             return
  
-        cmd("cd %s;tar -cjf %s --exclude='.svn' --transform='s,^,overlay/,' ./"
+        cmd("cd %s;tar -cjf %s --exclude='.svn' --transform='s,^,tree/,' ./"
             % (self.repodir, self.snapfile) )
 
 
@@ -140,7 +163,7 @@ if __name__ == '__main__':
     import getopt
     name        = None
     src         = None
-    type        = None
+    repo_type   = None
     rev         = None
     force       = False
     configfile  = None
@@ -154,17 +177,17 @@ REQUIRED ARGUMENTS:
     -c, --config <path>     Config file path
 
 OPTIONAL ARGUMENTS:
-    -t, --type <type>       Snapshot type
+    -R, --repo <repo_type>  Snapshot repository type
     -r, --rev  <rev>        Revison to snapshot (default is HEAD)
     -f, --force             Force overwriting of files.
     -h, --help              This screen
 """
 
     try:
-        sa, la = getopt.gnu_getopt(sys.argv[1:], "n:s:t:r:fhc:",
+        sa, la = getopt.gnu_getopt(sys.argv[1:], "n:s:R:r:fhc:",
                     [   'name',
                         'source',
-                        'type',
+                        'repo_type',
                         'rev',
                         'force',
                         'help',
@@ -178,8 +201,8 @@ OPTIONAL ARGUMENTS:
             name = a
         elif o in ('-s', '--source'):
             args['snapshot.src'] = a
-        elif o in ('-t', '--type'):
-            args['snapshot.type'] = a
+        elif o in ('-t', '--repo'):
+            args['snapshot.repo'] = a
         elif o in ('-r', '--rev'):
             args['snapshot.rev'] = a
         elif o in ('-f', '--force'):

@@ -74,9 +74,9 @@ def get_checksum(path, hash_type='md5'):
 
 def write_hashfile(dest_dir, hashed_file, hash_dict, dest_filename=None):
     if dest_filename == None:
-        dest = os.path.join(dest_dir, hashed_file+'.DIGESTS')
+        dest = path_join(dest_dir, os.path.basename(hashed_file+'.DIGESTS'))
     else:
-        dest = os.path.join(dest_dir, dest_filename)
+        dest = path_join(dest_dir, os.path.basename(dest_filename))
 
     try:
         f = open(dest, 'w')
@@ -91,6 +91,14 @@ def write_hashfile(dest_dir, hashed_file, hash_dict, dest_filename=None):
             os.unlink(dest)
         raise InhibitorError("Unable to write hashfile to %s: %s"
             % (dest, e.message))
+
+def path_join(*paths):
+    path_list = [paths[0]]
+    for p in paths[1:]:
+        path_list.append(p.strip('/'))
+
+    return os.path.normpath(os.path.join(*path_list))
+
 
 def _kill_pids(pids, ignore_exceptions=True):
     if type(pids) == int:
@@ -177,14 +185,16 @@ def _spawn_bash(cmdline, env, return_output=False):
 
     return _spawn(args, env, exe='/bin/bash', return_output=return_output)
 
-def cmd(cmdline, env={}):
+def cmd(cmdline, env={}, raise_exception=True):
     try:
         sys.stdout.flush()
         ret = _spawn_bash(cmdline, env)
         if ret != 0:
-            raise InhibitorError("'%s' returned %d" % (cmdline, ret))
+            if raise_exception:
+                raise InhibitorError("'%s' returned %d" % (cmdline, ret))
     except:
         raise
+    return ret
 
 def cmd_out(cmdline, env={}):
     try:
