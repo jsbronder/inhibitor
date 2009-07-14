@@ -30,7 +30,7 @@ class InhibitorObject(object):
                 'valid_keys':       ['verbose',     'debug',        'catalyst_support',
                                     'force',        'tmp',          'stage_cache',
                                     'root',         'snapshots',    'snapshot_cache',
-                                    'builds'        'repo_cache',   'packages' ],
+                                    'builds',       'repo_cache',   'packages' ],
                 'config_init':      {},
             }
         }
@@ -71,18 +71,17 @@ class InhibitorObject(object):
                 load_list.append(setting)
         
         self._load_external_settings(load_list, cmdline)
-            
 
         if config_file:
             self.config_file = config_file
             self.load_config(config_file, load_list)
+        
+        # Expand from self.base settings.
+        self.expand_base_settings(**keywords)
 
         # Make sure all of our settings make sens.
-        self.sanity(check_list=load_list)
-
-        # Expand from self.base settings.
-        self._expand_base_settings()
-
+        if 'base' in load_list:
+            self.sanity(check_list=['base'])
 
     def _load_external_settings(self, load_list, cmdline):
         """
@@ -132,38 +131,33 @@ class InhibitorObject(object):
             if not k in dict or overwrite:
                 dict[k] = val
 
-    def _expand_base_settings(self):
+    def expand_base_settings(self, **keywords):
         s = self.base
 
-        if not 'force' in s:
-            s['force'] = False
-        if not 'debug' in s:
-            s['debug'] = False
-        if not 'catalyst_support' in s:
-            s['catalyst_support'] = False
+        for k in ['verbose', 'force', 'debug' ]:
+            if not k in s:
+                s[k] = k in keywords and keywords[k] or False
 
         global inhibitor_debug
         inhibitor_debug = s['debug']
-        global catalyst_support
-        catalyst_support = s['catalyst_support']
 
-        self.update_setting( s, 'root', os.path.join(s['rootdir'], self.version))
+        self.update_setting(s, 'root', os.path.join(s['rootdir'], self.version))
+        self.update_setting(s, 'installdir', os.getcwd())
 
         dirs =[ 'snapshot_cache',   'snapshots',    'repo_cache',
                 'packages',         'builds',       'tmp',
                 'stage_cache' ]
         
         for dir in dirs:
-            targ = os.path.join(s['root'], dir) 
+            targ = path_join(s['root'], dir) 
             self.update_setting( s, dir, targ )
             if not os.path.isdir(targ):
                 if os.path.exists(targ):
-                    warn('%s is not a directory, removing' % targ)
+                    raise InhibitorError('%s is not a directory, removing' % targ)
                 os.makedirs(targ)
 
-
     def load_config(self, config_file, load_list):
-        mod = __import__(config_file, globals(), locals())
+        mod = __import__(config_file.rstrip('.py'), globals(), locals())
         for name,v in self.settings_conf.items():
             if not name in load_list:
                 continue
