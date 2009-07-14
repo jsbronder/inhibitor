@@ -11,6 +11,7 @@ class InhibitorSnapshot(InhibitorObject):
 
     TODO:
         - support git branches
+        - repos aside from git (rsync, then svn probably)
     """
 
     def __init__(self, name, rev=None, **keywords):
@@ -45,7 +46,7 @@ class InhibitorSnapshot(InhibitorObject):
                 % (self.name, self.rev))
 
 
-        if not self.repo_type in ['svn', 'git']:
+        if not self.repo_type in ['git']:
             raise InhibitorError('Unknown snapshot src repo_type:  \'%s\'' % self.src)
 
     def is_overlay(self):
@@ -71,8 +72,6 @@ class InhibitorSnapshot(InhibitorObject):
     def run(self):
         if self.repo_type == 'git':
             self._git_create_snapshot()
-        elif self.repo_type == 'svn':
-            self._svn_create_snapshot()
 
         self.create_cachedir()
 
@@ -127,36 +126,6 @@ class InhibitorSnapshot(InhibitorObject):
       
         md5_hash = get_checksum(self.snapfile)
         write_hashfile(self.snapdir, self.snapfile, {'md5':md5_hash})
-
-
-    def _svn_create_snapshot(self):
-        svndir = path_join(self.repodir, '.svn')
-        if not os.path.isdir(svndir):
-            if os.path.exists(self.repodir):
-                warn('%s is not a svn repository.  Removing.' % self.repodir)
-                try:
-                    shutil.rmtree(self.repodir)
-                except OSError, e:
-                    InhibitorError('Cannot clean directory: %s' %e)
-            cmd('svn checkout %s %s' % (self.src, self.repodir))    
-
-        if self.rev == None:
-            cmd('svn up %s' % (self.repodir))
-            self.rev = cmd_out("svn info %s | awk '/Revision/{print $2}'" % self.repodir)
-            self.rev = 'r' + self.rev
-            self.snapfile = path_join(self.snapdir, '%s-%s.tar.bz2'
-                % (self.name, self.rev))
-        else:
-            if self.rev[0] != 'r':
-                self.rev = 'r' + self.rev
-            cmd('svn up -%s %s' % (self.rev, self.repodir))
-
-        if not self.force and self.current_cache():
-            info('Skipping archive step, %s already exists' % os.path.basename(self.snapfile))
-            return
- 
-        cmd("cd %s;tar -cjf %s --exclude='.svn' --transform='s,^,tree/,' ./"
-            % (self.repodir, self.snapfile) )
 
 
 if __name__ == '__main__':
