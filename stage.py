@@ -6,7 +6,6 @@ from base import InhibitorObject
 from snapshot import InhibitorSnapshot
 
 class InhibitorStage(InhibitorObject):
-
     def __init__(self,
         name,
         config_init={},
@@ -290,6 +289,8 @@ class InhibitorStage(InhibitorObject):
 
 class InhibitorStageOne(InhibitorStage):
     def __init__(self, name, **keywords):
+        if not name.startswith('stage1-'):
+            name = 'stage1-' + name
         super(InhibitorStageOne, self).__init__(name, config_init={'stage':'stage1'}, **keywords)
 
         self.set_stage_run()
