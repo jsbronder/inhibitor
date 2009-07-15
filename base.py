@@ -1,5 +1,6 @@
 import types
 import re
+import shutil
 
 from base_funcs import *
 
@@ -19,10 +20,13 @@ class InhibitorObject(object):
     """
     def __init__(self,
         settings_conf,
+        actions={},
         settings_override={},
         cmdline={},
         config_file=None,
         **keywords):
+
+        self.actions = actions
 
         self.settings_conf = {
             'base': {
@@ -208,6 +212,54 @@ class InhibitorObject(object):
 
         if not sane:
             raise InhibitorError('Bailing out due to invalid settings.')
+
+    def run_action(self, action):
+        if not action in self.actions:
+            raise InhibitorError('Undefined action name: %s' % action)
+        
+        function_list = []
+        for func_name in self.actions[action]:
+            if not hasattr(self, func_name):
+                raise InhibitorError('Undefined function %s for action %s' % (func_name, action))
+            f = getattr(self, func_name)
+            if not type(f) == types.MethodType:
+                raise InhibitorError('In action %s, name %s is not a function' % (action, func_name))
+            function_list.append(f)
+
+        id = hasattr(self, 'name') and getattr(self, 'name') or None
+        if id == None:
+            warn('No identifier found for this action, resume will not be supported.')
+        else:
+            status_dir = path_join(self.base['tmp'], 'status', id)
+            if self.base['force']:
+                warn('Force enabled, cleaning status files')
+                shutil.rmtree(status_dir)
+            if not os.path.isdir(status_dir):
+                os.makedirs(status_dir)
+
+        for i in range(0, len(function_list)):
+            if id:
+                status_file = path_join(status_dir, action + '-' + self.actions[action][i])
+                if os.path.exists(status_file):
+                    warn('Resume:  Skipping previously completed %s step' % self.actions[action][i])
+                    continue
+            try:
+                function_list[i]()
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except Exception, e:
+                import traceback
+                print '---------------------------------------------------'
+                traceback.print_exc()
+                print '---------------------------------------------------'
+                raise InhibitorError('Exception during action %s, function %s.'
+                    % (action, self.actions[action][i]))
+
+            if id:
+                open(status_file, 'w').close()
+
+        if id:
+            shutil.rmtree(status_dir)
 
 
 

@@ -17,6 +17,11 @@ class InhibitorSnapshot(InhibitorObject):
     def __init__(self, name, **keywords):
         self.name = name
 
+        actions = {
+            'get_revision':     ['get_revision', 'create_snapfile', 'create_cachedir', 'finish'],
+            'get_latest':       ['update_repo', 'parse_rev', 'create_snapfile', 'create_cachedir', 'finish']
+        }
+
         settings_conf = {
             'snapshot': {
                 'required_keys':    ['repo_type',   'src',          'type'],
@@ -28,6 +33,7 @@ class InhibitorSnapshot(InhibitorObject):
 
         super(InhibitorSnapshot, self).__init__(
             settings_conf=settings_conf,
+            actions=actions,
             **keywords)
        
         self.expand_snapshot_settings(**keywords)
@@ -36,7 +42,7 @@ class InhibitorSnapshot(InhibitorObject):
 
     def expand_snapshot_settings(self, **keywords):
         s = self.snapshot
-        s['repodir']    = path_join(self.base['repo_cache'], name ) + '/'
+        s['repodir']    = path_join(self.base['repo_cache'], self.name ) + '/'
         
         for k in ['src', 'repo_type', 'rev', 'snapfile']:
             if k in keywords:
@@ -44,7 +50,7 @@ class InhibitorSnapshot(InhibitorObject):
 
         if 'rev' in s:
             s['snapfile'] = path_join(self.base['snapshots'], '%s-%s.tar.bz2'
-                % (self.name, self.rev))
+                % (self.name, s['rev']))
         else:
             s['snapfile'] = 'unknown/until/we/get/a/revision'
 
@@ -62,11 +68,11 @@ class InhibitorSnapshot(InhibitorObject):
     def cachedir(self):
         return path_join(
             self.base['snapshot_cache'],
-            '%s-%s' % (self.name, self.rev),
+            '%s-%s' % (self.name, self.snapshot['rev']),
             'tree')
         
     def current_cache(self):
-        if not self.rev or not self.snapshot['snapfile']:
+        if not self.snapshot['rev'] or not self.snapshot['snapfile']:
             return False
        
         if os.path.exists(self.snapshot['snapfile']) \
@@ -79,6 +85,19 @@ class InhibitorSnapshot(InhibitorObject):
         self.parse_rev()
         self.create_snapfile()
         self.create_cachedir()
+
+
+    def get_revision(self):
+        if self.snapshot['repo_type'] == 'git':
+            check_dir = self.myenv['GIT_DIR']
+            has_revision_cmd = 'git log %s &>/dev/null' % self.snapshot['rev']
+
+        if not os.path.isdir( check_dir ):
+            self.update_repo()
+
+        rc = cmd(has_revision_cmd, env=self.myenv, raise_exception=False)
+        if rc != 0:
+            self.update_repo()
 
 
     def update_repo(self):
@@ -108,15 +127,15 @@ class InhibitorSnapshot(InhibitorObject):
     def parse_rev(self):
         if not 'rev' in self.snapshot:
             if self.snapshot['repo_type'] == 'git':
-                self.rev = file_getline( path_join(
+                self.snapshot['rev'] = file_getline( path_join(
                     self.snapshot['repodir'],
                     '.git', 'refs', 'heads', 'master'))
-                self.rev = self.rev[:7]
+                self.snapshot['rev'] = self.snapshot['rev'][:7]
 
         if self.snapshot['snapfile'].startswith('unknown/'):
             self.snapshot['snapfile'] = path_join(
                 self.base['snapshots'],
-                    '%s-%s.tar.bz2' % (self.name, self.rev))
+                    '%s-%s.tar.bz2' % (self.name, self.snapshot['rev']))
 
     def create_snapfile(self):
         if not self.base['force'] and self.current_cache():
@@ -133,7 +152,7 @@ class InhibitorSnapshot(InhibitorObject):
                
         if self.snapshot['repo_type'] == 'git':
             do = 'git archive --format=tar --prefix=tree/ %s | bzip2 --fast -f > %s' \
-                % (self.rev, self.snapshot['snapfile'])
+                % (self.snapshot['rev'], self.snapshot['snapfile'])
 
         cmd(do, env=self.myenv)
         md5_hash = get_checksum(self.snapshot['snapfile'])
@@ -147,13 +166,22 @@ class InhibitorSnapshot(InhibitorObject):
     def create_cachedir(self):
         base_dir = path_join(
             self.base['snapshot_cache'],
-            '%s-%s' % (self.name, self.rev)
+            '%s-%s' % (self.name, self.snapshot['rev'])
         )
         if os.path.exists(base_dir):
             shutil.rmtree(base_dir)
         
         os.makedirs(base_dir)
         cmd('tar -xjpf %s -C %s/' % (self.snapshot['snapfile'], base_dir))
+
+    def finish(self):
+        print
+        info('Snapshot successfully created.')
+        print '\tRevision: %s' % self.snapshot['rev']
+        print '\tSnapshot: %s' % self.snapshot['snapfile']
+        print '\tCache:    %s' % path_join(self.base['snapshot_cache'],
+            '%s-%s' % (self.name, self.snapshot['rev']))
+        print '\tRepo:     %s' % self.snapshot['repodir']
 
 
 if __name__ == '__main__':
