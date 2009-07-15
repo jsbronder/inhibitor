@@ -91,7 +91,7 @@ class InhibitorSnapshot(InhibitorObject):
         if not os.path.isdir( check_dir ):
             if os.path.exists(self.snapshot['repodir']):
                 warn('%s is not a %s repository.'
-                    % ( self.snapshot['repodir'], self.snapshot['repo_type'])
+                    % ( self.snapshot['repodir'], self.snapshot['repo_type']))
                 if self.base['force']:
                     warn('Removing...')
                     try:
