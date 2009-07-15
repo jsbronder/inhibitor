@@ -175,6 +175,8 @@ class InhibitorSnapshot(InhibitorObject):
         cmd('tar -xjpf %s -C %s/' % (self.snapshot['snapfile'], base_dir))
 
     def finish(self):
+        if self.base['quiet']:
+            return
         print
         info('Snapshot successfully created.')
         print '\tRevision: %s' % self.snapshot['rev']

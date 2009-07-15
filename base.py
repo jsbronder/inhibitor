@@ -34,7 +34,8 @@ class InhibitorObject(object):
                 'valid_keys':       ['verbose',     'debug',        'catalyst_support',
                                     'force',        'tmp',          'stage_cache',
                                     'root',         'snapshots',    'snapshot_cache',
-                                    'builds',       'repo_cache',   'packages' ],
+                                    'builds',       'repo_cache',   'packages',
+                                    'quiet'],
                 'config_init':      {},
             }
         }
@@ -138,7 +139,7 @@ class InhibitorObject(object):
     def expand_base_settings(self, **keywords):
         s = self.base
 
-        for k in ['verbose', 'force', 'debug' ]:
+        for k in ['verbose', 'force', 'debug', 'quiet' ]:
             if not k in s:
                 s[k] = k in keywords and keywords[k] or False
 

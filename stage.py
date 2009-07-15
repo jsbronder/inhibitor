@@ -107,7 +107,8 @@ class InhibitorStage(InhibitorObject):
                 snap_def[0],
                 rev=snap_def[1],
                 config_file=self.config_file,
-                settings_override=override)
+                settings_override=override,
+                quiet=True)
 
             if snapshot.current_cache():
                 info('Using cached copy of %s' % '-'.join(snap_def))
