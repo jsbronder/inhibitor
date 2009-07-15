@@ -10,6 +10,7 @@ class InhibitorStage(InhibitorObject):
         name,
         config_init={},
         cmdline={},
+        actions={},
         **keywords):
 
         self.name = name
@@ -27,10 +28,19 @@ class InhibitorStage(InhibitorObject):
                 'config_init':      config_init,
             }
         }
-
+        
+        if len(actions) == 0:
+            actions = {
+                'create':   ['unpack_seed',     'get_snapshots',        'write_confdir',
+                            'write_make_conf',  'write_stage_run',      'files_to_chroot',
+                            'bind_mounts',      'setup_profile',        'stage_run',
+                            'unbind_mounts',    'clean',                'pack']
+            }
+        
         super(InhibitorStage, self).__init__(
             settings_conf=settings_conf,
             cmdline=cmdline,
+            actions=actions,
             **keywords)
        
         self.init_vars()
