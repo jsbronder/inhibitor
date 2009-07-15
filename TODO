@@ -1,0 +1,5 @@
+- Make sure there are no active mounts in the stage directory before starting.
+- Some actions need to run every time.
+    - mounting
+    - finding mount paths
+- Unmount everything on errors if possible.
