@@ -82,7 +82,7 @@ export CXXFLAGS="${CFLAGS}"
 def get_portage_conf(stage):
     portage_conf = {}
     if stage in ['stage1', 'stage2', 'stage3']:
-        portage_conf['keywords.base'] = """
+        portage_conf['keywords/base'] = """
 =sys-fs/udev-135*
 =sys-apps/sysvinit-2.86*
 =sys-apps/hal-0.5.11*

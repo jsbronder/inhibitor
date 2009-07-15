@@ -21,9 +21,9 @@ class InhibitorStage(InhibitorObject):
         settings_conf = {
             'stage':    {
                 'required_keys':    ['snapshot',    'profile',          'arch',
-                                    'make_conf'],
+                                    'make_conf',     'run_cmdline'  ],
                 'valid_keys':       ['overlays',    'portage_conf',     
-                                    'seed',         'clean',            'stage_run',
+                                    'seed',         'clean',
                                     'stage_scripts','stage_config',     'package_cache' ],
                 'config_init':      config_init,
             }
@@ -31,9 +31,9 @@ class InhibitorStage(InhibitorObject):
         
         if len(actions) == 0:
             actions = {
-                'create':   ['unpack_seed',     'get_snapshots',        'write_confdir',
-                            'write_make_conf',  'write_stage_run',      'files_to_chroot',
-                            'bind_mounts',      'setup_profile',        'stage_run',
+                'create':   ['create_dirs', 'unpack_seed',     'get_snapshots',        'write_confdir',
+                            'write_make_conf',  'files_to_chroot',
+                            'bind_mounts',      'setup_profile',
                             'unbind_mounts',    'clean',                'pack']
             }
         
@@ -64,9 +64,6 @@ class InhibitorStage(InhibitorObject):
         if self.stage['overlays']:
             self.snapshots.extend(self.stage['overlays'])
 
-        self.builddir   = path_join(self.base['builds'], self.name)
-        self.tarfile    = path_join(self.base['tmp'], self.name)
-
         if 'package_cache' in self.stage:
             self.pkgcache = self.stage['package_cache']
         else:
@@ -90,8 +87,17 @@ class InhibitorStage(InhibitorObject):
             '/etc/hosts':               {},
             '/etc/resolv.conf':         {},
             'inhibitor-functions.sh':   {'dest':'/tmp/inhibitor/'},
+            'inhibitor-run.sh':         {
+                'dest':     '/tmp/inhibitor/',
+                'mode':     0755 }
+
         }
- 
+
+    def create_dirs(self):
+        # Don't worry, it'll be extended in the future :)
+        for d in [ self.pkgcache ]:
+            if not os.path.exists(d):
+                os.makedirs(d)
 
 
     def unpack_seed(self):
@@ -115,7 +121,6 @@ class InhibitorStage(InhibitorObject):
                 % (self.seed, self.builddir))
     
     def get_snapshots(self):
-        overlay_cnt = 1
         override = {'base':self.base}
 
         for snap_def in self.snapshots:
@@ -132,14 +137,6 @@ class InhibitorStage(InhibitorObject):
                 info('Creating snapshot of %s' % '-'.join(snap_def))
                 snapshot.run()
 
-            if snapshot.is_overlay():
-                self.mounts[snapshot.cachedir()] = {'dest':'/usr/local/overlay-%d' % overlay_cnt}
-                overlay_cnt += 1
-            else:
-                if '/usr/portage' in self.mounts.values():
-                    raise InhibitorError('More then one portage snapshot specified.')
-                self.mounts[snapshot.cachedir()] = {'dest':'/usr/portage'}
-
     def write_confdir(self):
         bd = path_join(self.builddir, 'etc', 'portage')
         if not os.path.exists(bd):
@@ -147,7 +144,21 @@ class InhibitorStage(InhibitorObject):
 
         for path, contents in self.stage['portage_conf'].items():
             try:
-                fd = open(path_join(bd, path), 'w')
+                dest = path_join(bd, path)
+                dest_dir = os.path.dirname(dest)
+                
+                if os.path.exists(dest):
+                    if os.path.isdir(dest):
+                        shutil.rmtree(dest)
+                    else:
+                        os.unlink(dest)
+
+                if not os.path.isdir(dest_dir):
+                    if os.path.exists(dest_dir):
+                        shutil.rmtree(dest_dir)
+                    os.makedirs(dest_dir)
+
+                fd = open(dest, 'w')
                 fd.write(contents)
                 fd.close()
             except (IOError, OSError), e:
@@ -163,18 +174,6 @@ class InhibitorStage(InhibitorObject):
         except (IOError, OSError), e:
             raise InhibitorError('Failed to write %s: %s'
                 % (f, e))
-
-    def write_stage_run(self):
-        f = path_join(self.builddir, 'tmp', 'stage_run')
-        try:
-            fd = open(f, 'w')
-            fd.write(self.stage['stage_run'])
-            fd.close()
-            os.chmod(f, 0755)
-        except (IOError, OSError), e:
-            raise InhibitorError('Failed to write %s: %s'
-                % (f, e))
-
 
     def setup_profile(self):
         if self.stage['profile'].startswith('/'):
@@ -201,14 +200,16 @@ class InhibitorStage(InhibitorObject):
 
             if 'dest' in info:
                 dest = path_join(self.builddir, info['dest'])
+                if info['dest'].endswith('/'):
+                    dest = path_join(dest, f)
             elif f.startswith('/'):
                 # path_join doesn't like leading /'s
                 dest = path_join(self.builddir, f[1:])
             else:
-                dest = path_join(self.builddir, 'tmp', f)
+                dest = path_join(self.builddir, 'tmp', 'inhibitor', f)
 
-            if not os.path.exists(os.path.basename(dest)):
-                os.makedirs(os.path.basename(dest))
+            if not os.path.exists(os.path.dirname(dest)):
+                os.makedirs(os.path.dirname(dest))
             
             shutil.copy(src, dest)
 
@@ -219,8 +220,6 @@ class InhibitorStage(InhibitorObject):
         #   - Insert variables metro style. $[[stage/run_script]]
 
         write_files = []
-        if 'stage_run' in self.stage:
-            write_files.append( (self.stage['stage_run'], 'stage_run', 0755) )
 
         if 'stage_scripts' in self.stage:
             for f in self.stage['stage_scripts']:
@@ -242,6 +241,25 @@ class InhibitorStage(InhibitorObject):
                     % (filename, e) )
 
     def bind_mounts(self):
+        overlay_cnt = 1
+        override = {'base':self.base}
+
+        for snap_def in self.snapshots:
+            snapshot = InhibitorSnapshot(
+                snap_def[0],
+                rev=snap_def[1],
+                config_file=self.config_file,
+                settings_override=override,
+                quiet=True)
+
+            if snapshot.is_overlay():
+                self.mounts[snapshot.cachedir()] = {'dest':'/usr/local/overlay-%d' % overlay_cnt}
+                overlay_cnt += 1
+            else:
+                if '/usr/portage' in self.mounts.values():
+                    raise InhibitorError('More then one portage snapshot specified.')
+                self.mounts[snapshot.cachedir()] = {'dest':'/usr/portage'}
+
         # Shorter path means we should mount first.
         # At least, in practice, that'll usually work.
         mount_order = sorted(self.mounts.keys())
@@ -249,35 +267,31 @@ class InhibitorStage(InhibitorObject):
             dest = m
             if 'dest' in self.mounts[m]:
                 dest = self.mounts[m]['dest']
-            if dest.startswith('/'):
-                dest = dest[1:]
 
             full_dest = path_join(self.builddir, dest)
-
+            
             if not os.path.exists(full_dest):
                 os.makedirs(full_dest)
                 self.stage['clean'].append(dest)
             cmd('mount -o bind %s %s' % (m, path_join(self.builddir, dest)) )
 
 
-    def stage_run(self):
-        if 'stage_run' in self.stage:
-            cmd('chroot %s %s'  % (self.builddir, path_join('tmp', 'stage_run')))
+    def run_in_chroot(self):
+        cmd('chroot %s /tmp/inhibitor/inhibitor-run.sh %s'
+            % (self.builddir, self.run_cmdline) )
 
    
     def unbind_mounts(self):
-        unmount_order = self.mounts.keys().sort().reverse()
+        unmount_order = []
+        for k,v in self.mounts.items():
+            if 'dest' in v:
+                unmount_order.append(path_join(self.builddir, v['dest']))
+            else:
+                unmount_order.append(path_join(self.builddir, k))
+
+        unmount_order.reverse()
         failed = False
-        for m in unmount_order:
-            mp = m
-            if 'dest' in self.mounts[m]:
-                mp = self.mounts[m]['dest']
-
-            mp = path_join(self.builddir, mp)
-
-            if not os.path.ismount(mp):
-                continue
-
+        for mp in unmount_order:
             if cmd('umount %s' % mp, raise_exception=False) != 0:
                 warn('Unmount of %s failed' % mp)
                 warn('Killing any processes still running in the chroot')
@@ -293,8 +307,13 @@ class InhibitorStage(InhibitorObject):
         if 'clean' in self.stage:
             for x in self.stage['clean']:
                 path = x
+
                 if not x.startswith(self.builddir):
                     path = path_join(self.builddir, x)
+
+                if not os.path.exists(path):
+                    continue
+
                 if not os.path.isdir(path):
                     os.unlink(path)
                 else:
@@ -308,37 +327,7 @@ class InhibitorStageOne(InhibitorStage):
     def __init__(self, name, **keywords):
         if not name.startswith('stage1-'):
             name = 'stage1-' + name
-        super(InhibitorStageOne, self).__init__(name, config_init={'stage':'stage1'}, **keywords)
-
-        self.set_stage_run()
-
-
-    def set_stage_run(self):
-        if 'stage_run' in self.stage:
-            return
-
-        self.stage['stage_run'] = """
-#!/bin/bash
-cd /tmp
-if ! source ./inhibitor-functions.sh; then
-    echo
-    echo "ERROR:  Failed to source ./inhibitor-functions.sh"
-    echo
-    exit 1
-fi
-env-update
-run_stage1
-"""
-    def run(self):
-#       self.unpack_seed()
-       self.get_snapshots()
-       self.write_confdir()
-       self.write_make_conf()
-       self.write_stage_run()
-       self.files_to_chroot()
-       self.bind_mounts()
-       self.setup_profile()
-       self.stage_run()
-       self.unbind_mounts()
-       self.clean()
-       self.pack()
+        super(InhibitorStageOne, self).__init__(name, 
+            config_init={'stage':'stage1'},
+            run_cmdline='run_stage1',
+            **keywords)

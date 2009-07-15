@@ -25,6 +25,13 @@ init() {
 
 _run_emerge() {
     einfo "Emerging $*"
+    export EMERGE_WARNING_DELAY=0
+    export CLEAN_DELAY=0
+    export EBEEP_IGNORE=0
+    export EPAUSE_IGNORE=0
+    export CONFIG_PROTECT="-*"
+    export PKGDIR=/tmp/inhibitor/packages
+
     emerge --buildpkg --usepkg $* || die "emerge failed"
 }
 run_emerge() {
