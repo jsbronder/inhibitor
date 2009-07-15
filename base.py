@@ -234,7 +234,8 @@ class InhibitorObject(object):
             status_dir = path_join(self.base['tmp'], 'status', id)
             if self.base['force']:
                 warn('Force enabled, cleaning status files')
-                shutil.rmtree(status_dir)
+                if os.path.exists(status_dir):
+                    shutil.rmtree(status_dir)
             if not os.path.isdir(status_dir):
                 os.makedirs(status_dir)
 
