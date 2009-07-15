@@ -24,7 +24,7 @@ class InhibitorStage(InhibitorObject):
                                     'make_conf'],
                 'valid_keys':       ['overlays',    'portage_conf',     
                                     'seed',         'clean',            'stage_run',
-                                    'stage_scripts','stage_config' ],
+                                    'stage_scripts','stage_config',     'package_cache' ],
                 'config_init':      config_init,
             }
         }
@@ -66,7 +66,12 @@ class InhibitorStage(InhibitorObject):
 
         self.builddir   = path_join(self.base['builds'], self.name)
         self.tarfile    = path_join(self.base['tmp'], self.name)
-       
+
+        if 'package_cache' in self.stage:
+            self.pkgcache = self.stage['package_cache']
+        else:
+            self.pkgcache = path_join(self.base['packages'], self.name)
+        
         cleanable = ['/tmp', '/var/tmp/']
         if not 'clean' in self.stage:
             self.stage['clean'] = cleanable
@@ -75,14 +80,16 @@ class InhibitorStage(InhibitorObject):
 
 
         self.mounts = {
-            '/proc':    {},
-            '/dev':     {},
-            '/sys':     {},
+            '/proc':        {},
+            '/dev':         {},
+            '/sys':         {},
+            self.pkgcache:  {'dest':'/tmp/inhibitor/packages'}
         }
+
         self.copy_files = {
             '/etc/hosts':               {},
             '/etc/resolv.conf':         {},
-            'inhibitor-functions.sh':   {'dest':'/tmp'},
+            'inhibitor-functions.sh':   {'dest':'/tmp/inhibitor/'},
         }
  
 
