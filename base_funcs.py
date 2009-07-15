@@ -40,6 +40,7 @@ class InhibitorError(Exception):
             print
             err("Inhibitor Error:  %s" % message)
             print
+            sys.exit(1)
 
 def file_getline(path, err_msg=""):
     if os.path.exists(path):
