@@ -10,6 +10,8 @@ import types
 catalyst_support = True
 inhibitor_debug = False
 
+mount_list = {}
+
 def info(message):
     print "\001\033[0;32m\002*\001\033[0m\002 %s" % message
 
@@ -41,6 +43,67 @@ class InhibitorError(Exception):
             err("Inhibitor Error:  %s" % message)
             print
             sys.exit(1)
+
+
+def umount(key, root=None):
+    global mount_list
+    if not key or not key in mount_list:
+        err('base_funcs.umount called with invalid key \'%s\'' % key)
+        return False
+
+    md = mount_list[key]
+    if root and not md['root'].startswith(root):
+        # This mount is not inside of the root we wish to remove everything from
+        return True
+
+    if cmd('umount %s' % key, raise_exception=False) != 0:
+        warn('Unmount of %s failed.' % key)
+        warn('Killing any processes still running in %s' % md['root']
+        pl = []
+        for root in glob.glob('/proc/[0-9][0-9]*/root'):
+            if os.readlink(root).startswith(dir):
+                pl.append( root[len('/proc/'):-len('/root')] )
+        _kill_pids(pl)
+
+        if cmd('umount %s' % key, raise_exception=False) != 0:
+            err('Cound not unmount %s' % key)
+            return False
+
+    return True
+
+
+def umount_all(root=None)
+    global mount_list
+
+    umount_order = sorted(mount_list.keys())
+    umount_order.reverse()
+    
+    for mp in umount_list:
+        umount(mp, root=root)
+   
+def mount(src, dest, root, type='bind'):
+    global mount_list
+
+    src = os.path.normpath(src)
+    dest = os.path.normpath(dest)
+    root = os.path.normpath(root)
+    if dest in mount_list:
+        raise CatalystError('%s is already in the mount list' % dest)
+
+    cmd = 'mount '
+    if type == 'bind':
+        cmd += '-o bind '
+    else:
+        raise InhibitorError('Unknown mount type \'%s\'' %type)
+
+    cmd += '%s %s' % (src, dest)
+    cmd(cmd)
+
+    mount_list[dest] = {
+        'src':  src,
+        'type': type,
+        'root': root
+    }
 
 def file_getline(path, err_msg=""):
     if os.path.exists(path):
