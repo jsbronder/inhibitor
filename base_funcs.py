@@ -58,7 +58,7 @@ def umount(key, root=None):
 
     if cmd('umount %s' % key, raise_exception=False) != 0:
         warn('Unmount of %s failed.' % key)
-        warn('Killing any processes still running in %s' % md['root']
+        warn('Killing any processes still running in %s' % md['root'])
         pl = []
         for root in glob.glob('/proc/[0-9][0-9]*/root'):
             if os.readlink(root).startswith(dir):
@@ -72,7 +72,7 @@ def umount(key, root=None):
     return True
 
 
-def umount_all(root=None)
+def umount_all(root=None):
     global mount_list
 
     umount_order = sorted(mount_list.keys())
