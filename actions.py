@@ -83,11 +83,16 @@ class InhibitorStage(InhibitorAction):
         self.istate     = inhibitor_state
         self.builddir   = self.istate.paths.build.join(self.build_name)
         self.seed       = self.istate.paths.stages.join(self.conf.seed)
+        self.pkgdir     = self.istate.paths.pkgs.join(self.build_name)
         # Update state
         self.istate.paths.chroot = self.builddir
 
         for src in self.sources:
             src.post_conf(inhibitor_state)
+
+        if not os.path.exists(self.pkgdir):
+            util.warn("Package cache %s does not exist yet.")
+            os.makedirs(self.pkgdir)
 
 
     def get_sources(self):
@@ -135,6 +140,12 @@ class InhibitorStage(InhibitorAction):
         for m in ('/proc', '/dev', '/sys'):
             mount = util.Mount(m, m, self.builddir)
             util.mount(mount, self.istate.mount_points)
+
+        mount = util.Mount(
+            self.pkgdir,
+            '/tmp/pkgs',
+            self.builddir)
+        util.mount(mount, self.istate.mount_points)
 
     def chroot(self):
         try:
