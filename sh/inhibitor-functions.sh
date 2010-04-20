@@ -122,9 +122,13 @@ _run_stage1(){
     run_emerge --oneshot ${packages}
 }
 run_stage1(){
-    init
     _run_stage1
 }
 
 
-
+run_generic_stage(){
+    echo
+    echo "In Generic Stage Chroot!"
+    sleep 20
+    echo
+}
