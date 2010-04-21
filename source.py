@@ -140,17 +140,10 @@ class _GenericSource(object):
     def clean(self):
         pass
 
-    def tar_exclude(self, filename):
-        ret = filename not in ('.svn', '.git', '*.swp')
-        print filename, ret
-        return ret
-
     def pack(self):
         fpath = self.cachedir + '.tar.bz2'
         dbg("Creating %s from %s" % (fpath, self.cachedir))
         archive = tarfile.open(fpath, 'w:bz2')
-#        wd = os.getcwd()
-#        os.chdir(self.cachedir+'/../')
         for root, dirs, files in os.walk(self.cachedir):
             include = dirs[:]
             include.extend(files)
@@ -162,12 +155,6 @@ class _GenericSource(object):
                 archive.add(full_path,
                     arcname = full_path[striplen:],
                     recursive = False )
-
-#        try:
-#            f.add(self.name, recursive=True, exclude=self.tar_exclude)
-#        except:
-#            os.chdir(wd)
-#            raise
         archive.close()
         return fpath
 
