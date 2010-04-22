@@ -1,11 +1,43 @@
 #!/bin/bash
 
-if ! source /etc/init.d/functions.sh; then
+trap "echo;echo Caught SIGTERM on pid $$;echo;kill -SIGTERM -$$;" SIGTERM
+trap "echo;echo Caught SIGINT on pid $$ ;echo;kill -SIGINT  -$$;" SIGINT
+
+DEBUG=false
+
+_STAR_GREEN="\001\033[0;32m\002*\001\033[0m\002"
+_STAR_YELLOW="\001\033[1;33m\002*\001\033[0m\002"
+_STAR_RED="\001\033[0;31m\002*\001\033[0m\002"
+
+einfo() {
+    echo -e "${_STAR_GREEN} $*"
+}
+
+ewarn() {
+    echo -e "${_STAR_YELLOW} $*"
+}
+
+eerror() {
+    echo -e "${_STAR_RED} $*"
+}
+
+dot_timer() {
+    local i
+    local timeout=${1:-1}
     echo
-    echo "ERROR:  Failed to source /etc/init.d/functions.sh"
+
+    if ${DEBUG}; then
+        einfo "Hit any key to continue"
+        read -n 1 -s
+    else
+        echo -n -e "${_STAR_GREEN} Pausing for $1 second(s): ."
+        for ((i=0; i < $1; i++)); do
+            echo -n ' .'
+            sleep 1
+        done
+    fi
     echo
-    exit 1
-fi
+}
 
 die() {
     echo
@@ -23,16 +55,22 @@ init() {
     _init
 }
 
+
+
 _run_emerge() {
+    local i
+    echo
     einfo "Emerging $*"
+    echo
     export EMERGE_WARNING_DELAY=0
     export CLEAN_DELAY=0
     export EBEEP_IGNORE=0
     export EPAUSE_IGNORE=0
     export CONFIG_PROTECT="-*"
-    export PKGDIR=/tmp/inhibitor/packages
-
-    emerge --buildpkg --usepkg $* || die "emerge failed"
+    
+    emerge --quiet --pretend --verbose --nospinner --buildpkg --usepkg $* || die "emerge pretend failed"
+    dot_timer 5
+    emerge --quiet --nospinner --buildpkg --usepkg $* || die "emerge failed"
 }
 run_emerge() {
     _run_emerge $*
@@ -46,6 +84,15 @@ source_wrapper() {
     done
 }
 
+#########################################
+#   Testing Stage                       #
+#########################################
+run_generic_stage(){
+    echo
+    echo "In Generic Stage Chroot!"
+    sleep 20
+    echo
+}
 
 #########################################
 #   Stage 1                             #
@@ -125,10 +172,17 @@ run_stage1(){
     _run_stage1
 }
 
-
-run_generic_stage(){
-    echo
-    echo "In Generic Stage Chroot!"
-    sleep 20
-    echo
+_run_stage4(){
+    local packages="$(</tmp/inhibitor/package_list)"
+    local rc=0
+    run_emerge --oneshot --newuse virtual/portage
+    run_emerge --deep --newuse system
+    if [ "${packages}" != "system" ]; then
+        run_emerge --deep --newuse ${packages}
+    fi
 }
+
+run_stage4(){
+    _run_stage4
+}
+

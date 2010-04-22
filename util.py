@@ -7,6 +7,12 @@ import shutil
 import glob
 import traceback
 
+# XXX:  To remove
+try:
+    import portage.util as portage_util
+except ImportError:
+    import portage_util
+
 INHIBITOR_DEBUG = False
 
 class InhibitorError(Exception):
@@ -16,7 +22,7 @@ class InhibitorError(Exception):
         err("Exception Raised:  Cleaning up.\n")
 
     def __str__(self):
-        ret = '\n\n'
+        ret = '\n'
         ret += "\001\033[0;31m\002*\001\033[0m\002 %s" % "Error:  "
         for i in self.args:
             ret += '%s ' % i
@@ -29,7 +35,7 @@ class Path(types.StringType):
     def dname(self):
         return str(self) + "/" 
 
-    def join(self, *paths):
+    def pjoin(self, *paths):
         return Path(self.dname() + '/'.join(paths))
 
 class Container(object):
@@ -41,6 +47,10 @@ class Container(object):
 
     def has(self, key):
         return hasattr(self, key)
+
+    def update(self, key, value):
+        setattr(self, key, value)
+        self.keys.append(key)
 
 class Mount(object):
     def __init__(self, src, dest, root):
@@ -76,11 +86,11 @@ def mount(mount, mounts, options='-o bind'):
             % (mount.src, mount.dest, mount.root))
         return
 
-    full_dest = mount.root.join(mount.dest)
+    full_dest = mount.root.pjoin(mount.dest)
     if not os.path.isdir(full_dest):
         os.mkdir(full_dest)
         mount.rmdir = True
-    cmd('mount ' + options + ' %s %s' % (mount.src, mount.root.join(mount.dest)) )
+    cmd('mount ' + options + ' %s %s' % (mount.src, mount.root.pjoin(mount.dest)) )
     mounts.append(mount)
 
 def umount(mount, mounts):
@@ -92,7 +102,7 @@ def umount(mount, mounts):
     while mount in mounts:
         mounts.remove( mount )
 
-    fp = mount.root.join(mount.dest)
+    fp = mount.root.pjoin(mount.dest)
     if cmd('umount %s' % fp, raise_exception=False) != 0:
         warn('Unmount of %s failed.' % fp)
         warn('Killing any processes still running in %s' % mount.root)
@@ -239,4 +249,25 @@ def cmd_out(cmdline, env={}, raise_exception=True, chdir=None):
         return (ret, out)
     except:
         raise
+
+def make_conf_dict(path):
+    if os.path.exists(path):
+        return portage_util.getconfig(path, allow_sourcing=True)
+    else:
+        return {}
+
+def write_dict_bash(dict, path):
+    if type(path) == types.StringType:
+        path = Path(path)
+
+    if not os.path.isdir( os.path.dirname(path) ):
+        os.makedirs(os.path.dirname(path))
+
+    f = open(path, 'w')
+    keys = dict.keys()
+    keys.sort()
+    for k in keys:
+        f.write('%s="%s"\n' % (k,dict[k]))
+    f.close()
+
 

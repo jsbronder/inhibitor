@@ -20,6 +20,7 @@ class InhibitorState(object):
             stages      = util.Path('/var/tmp/inhibitor/%s/stages' % __version__),
             build       = util.Path('/var/tmp/inhibitor/%s/build'  % __version__),
             pkgs        = util.Path('/var/tmp/inhibitor/%s/pkgs'   % __version__),
+            dist        = util.Path('/var/tmp/inhibitor/%s/dist'   % __version__),
             share       = util.Path(os.path.abspath(os.curdir))
         )
 
@@ -62,49 +63,3 @@ class Inhibitor(object):
             raise
 
 
-
-
-act = {
-    'action':   'mksnapshot',
-    'src':      InhibitorSource('git://lex-bs.mmm.com/portage-overlay',
-        name='brontes3d',
-        rev='restorative-2.0.3_p5')
-}
-
-def etc_portage(conf):
-    ret = {}
-    ret['package.mask'] = """
-        # Py_NONE gets decreffed once to many times
-        >=dev-python/numarray-1.4
-        # Moves wpa_cli, Brontes bug #4270
-        >net-wireless/wpa_supplicant-0.6
-        # Does not install libwfb.so, required for older xorg-xserver
-        >=x11-drivers/nvidia-drivers-190
-        """
-    ret['package.keywords'] = {}
-    ret['package.keywords']['base'] = """
-        # EAPI 2
-        =sys-apps/portage-2.1.6*
-        """
-    ret['package.keywords']['devmode'] = """
-        # Nvidia
-        =x11-drivers/nvidia-drivers-185*
-        media-video/nvidia-settings
-        """
-    return ret
-
-tds = InhibitorSource(etc_portage)
-
-
-def main():
-    util.INHIBITOR_DEBUG = True
-    i = Inhibitor()
-    action = CreateSnapshotAction(act['src'])
-    i.run_action(action)
-    action = CreateSnapshotAction(tds)
-    i.run_action(action)
-
-
-
-if __name__ == '__main__':
-    main()

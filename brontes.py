@@ -2,7 +2,7 @@ import inhibitor
 import util
 from actions import CreateSnapshotAction
 from source import InhibitorSource
-from actions import InhibitorStage
+from actions import InhibitorStage4
 
 
 
@@ -14,28 +14,51 @@ def get_make_conf(conf):
     else:
         raise InhibitorError("Unknown system_type:  '%s'" % system_type)
 
-    return {'make.conf': """
-        export GENTOO_MIRRORS="http://mirror.mmm.com/ http://gentoo.osuosl.org/ http://distfiles.gentoo.org/"
-        export SYNC="rsync://lex-bs.mmm.com/portage-cydonian"
-        export LINGUAS="en"
-        export CHOST="x86_64-pc-linux-gnu"
-        export MAKEOPTS="-j5"
-        export VIDEO_CARDS="vesa"
-        export EPAUSE_IGNORE=0
-        export EBEEP_IGNORE=0
-        export USE_ORDER="pkg:env:pkginternal:conf:defaults:env.d"
-        export FEATURES="nodoc noinfo noman prefetch"
-        export EMERGE_DEFAULT_OPTS="--jobs --load-average=8"
+    return """
+        GENTOO_MIRRORS="http://mirror.mmm.com/ http://gentoo.osuosl.org/ http://distfiles.gentoo.org/"
+        SYNC="rsync://lex-bs.mmm.com/portage-cydonian"
+        LINGUAS="en"
+        CHOST="x86_64-pc-linux-gnu"
+        MAKEOPTS="-j5"
+        VIDEO_CARDS="vesa"
+        EPAUSE_IGNORE=0
+        EBEEP_IGNORE=0
+        USE_ORDER="pkg:env:pkginternal:conf:defaults:env.d"
+        FEATURES="nodoc noinfo noman prefetch parallel-fetch"
+        EMERGE_DEFAULT_OPTS="--jobs --load-average=8"
+        USE="-* bindist dlloader minimal no-old-linux nptl nptlonly xorg"
 
-        export CFLAGS="%s"
-        export CXXFLAGS="${CFLAGS}"
+        CFLAGS="%s"
+        CXXFLAGS="${CFLAGS}"
         # TODO: With gcc-4.3
-        #export CFLAGS="-O2 -march=core2 -msse4_1 -pipe -fomit-frame-pointer"
+        #CFLAGS="-O2 -march=core2 -msse4_1 -pipe -fomit-frame-pointer"
         # vim: ft=sh""" % _cflags
-    }
 
-
-
+def package_list():
+    return """
+        sys-kernel/brontes-sources
+        app-admin/pwgen
+        app-admin/sudo
+        app-admin/syslog-ng
+        net-misc/dhcpcd
+        net-misc/ntp
+        sci-biology/brontes-restorative
+        sys-apps/lava-cos-system
+        sys-boot/grub-static
+        sys-fs/device-mapper
+        sys-fs/jfsutils
+        sys-process/vixie-cron
+        x11-base/xorg-x11
+        x11-misc/touchcal
+        x11-misc/imgscreensaver
+        sys-apps/kexec-tools
+        sys-power/acpid
+        sys-fs/lvm2
+        sys-apps/openrc
+        sys-devel/bc
+        sys-apps/less
+        app-misc/screen
+    """.split(' \n\t')
 
 stageconf = util.Container(
     name            = 'cydonian',
@@ -51,14 +74,15 @@ stageconf = util.Container(
         'file:///home/jbronder/scm/inhibitor/trunk/overlays/cydonian/etc-portage'),
     make_conf       = InhibitorSource(get_make_conf, system_type='core2'),
     arch            = 'amd64',
-    seed            = 'stage3-amd64-cydonian-early-openrc-core2-r1'
+    seed            = 'stage3-amd64-cydonian-early-openrc-core2-r1',
+    package_list    = package_list
 )
 
 
 def main():
     util.INHIBITOR_DEBUG = True
     i = inhibitor.Inhibitor()
-    s = InhibitorStage(stageconf, 'cydonian')
+    s = InhibitorStage4(stageconf, 'cydonian')
     i.add_action(s)
     i.run()
 
