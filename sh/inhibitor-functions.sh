@@ -1,7 +1,7 @@
 #!/bin/bash
 
-trap "echo;echo Caught SIGTERM on pid $$;echo;kill -SIGTERM -$$;" SIGTERM
-trap "echo;echo Caught SIGINT on pid $$ ;echo;kill -SIGINT  -$$;" SIGINT
+trap "echo;echo Caught SIGTERM on pid $$;echo;kill -SIGTERM -$$;exit" SIGTERM
+trap "echo;echo Caught SIGINT on pid $$ ;echo;kill -SIGINT  -$$;exit" SIGINT
 
 DEBUG=false
 
@@ -59,6 +59,7 @@ init() {
 
 _run_emerge() {
     local i
+    local rc
     echo
     einfo "Emerging $*"
     echo
@@ -67,10 +68,22 @@ _run_emerge() {
     export EBEEP_IGNORE=0
     export EPAUSE_IGNORE=0
     export CONFIG_PROTECT="-*"
-    
-    emerge --quiet --pretend --verbose --nospinner --buildpkg --usepkg $* || die "emerge pretend failed"
-    dot_timer 5
-    emerge --quiet --nospinner --buildpkg --usepkg $* || die "emerge failed"
+
+    DIE_ON_FAIL=${DIE_ON_FAIL:-1}
+
+    for i in "--pretend --verbose" "--quiet"; do
+        emerge ${i} --nospinner --buildpkg --usepkg $*
+        rc=$?
+        if [ ${rc} -ne 0 ]; then
+            if [ ${DIE_ON_FAIL} -eq 0 ]; then
+                die "emerge failed"
+            else
+                return ${rc}
+            fi
+        fi
+        [ "${i}" != "--quiet" ] && dot_timer 5
+    done
+    return 0
 }
 run_emerge() {
     _run_emerge $*
