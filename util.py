@@ -88,7 +88,7 @@ def mount(mount, mounts, options='-o bind'):
 
     full_dest = mount.root.pjoin(mount.dest)
     if not os.path.isdir(full_dest):
-        os.mkdir(full_dest)
+        os.makedirs(full_dest)
         mount.rmdir = True
     cmd('mount ' + options + ' %s %s' % (mount.src, mount.root.pjoin(mount.dest)) )
     mounts.append(mount)
