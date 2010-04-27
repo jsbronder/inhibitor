@@ -2,6 +2,7 @@ import shutil
 import os
 import tarfile
 import types
+import time
 
 import util
 
@@ -29,6 +30,7 @@ class InhibitorSource(object):
         self.backend    = None
         self.cachedir   = None
         self.istate     = None
+        self.fetched    = False
 
     def _check(self):
         if not self.istate:
@@ -67,11 +69,14 @@ class InhibitorSource(object):
         """
         self._check()
         self.backend.fetch()
+        self.fetched = True
 
     def install(self):
         self._check()
         if self.dest == None:
             return
+        if not self.fetched:
+            self.fetch()
         self.backend.install(self.istate.paths.chroot, self.dest)
         
 
@@ -83,6 +88,8 @@ class InhibitorSource(object):
 
     def pack(self):
         self._check()
+        if not self.fetched:
+            self.fetch()
         return self.backend.pack()
 
 class _GenericSource(object):
@@ -211,23 +218,25 @@ class FuncSource(_GenericSource):
     def _write_dictionary(self, destdir, d):
         for k,v in d.items():
             if type(v) == types.StringType:
-               self._write_file(destdir.join(k), v)
+                self._write_file(destdir.join(k), v)
             else:
                 os.makedirs(destdir.pjoin(k))
                 self._write_dictionary(destdir.pjoin(k), v)
 
-    def _write_file(self, file, value):
+    @staticmethod
+    def _write_file(path, value):
         # Find the indentation level of the first line so we can strip
         # that from any following lines.  Allows use of multi-line strings
         # in the return dictionary with correct python indentation.
         b = value.lstrip('\n\t ')
         strip = len(value) - len(b) - 1
-        f = open(file, 'w')
+        f = open(path, 'w')
         for line in value.splitlines():
             f.write(line[strip:]+'\n')
         f.close()
  
     def install(self, root, dest):
+        nkeys = None
         if type(self.output) == types.DictType:
             nkeys = len(self.output.keys())
 
@@ -302,19 +311,19 @@ class GitSource(_GenericSource):
         else:
             util.cmd('git clone %s %s' % (self.src, self.cachedir))
 
-        rc, branches = util.cmd_out('git branch -l', env=self.env, chdir=self.cachedir)
+        _, branches = util.cmd_out('git branch -l', env=self.env, chdir=self.cachedir)
         if 'inhibitor' in branches:
             util.cmd('git branch -D inhibitor', env=self.env, chdir=self.cachedir)
         
         if self.rev != 'HEAD':
             util.cmd('git checkout -b inhibitor %s' % self.rev, env=self.env, chdir=self.cachedir)
         else:
-            rc, self.rev = util.cmd_out('git rev-parse HEAD', env=self.env)
+            _, self.rev = util.cmd_out('git rev-parse HEAD', env=self.env)
             self.rev = self.rev[:7]
 
     def clean(self, root, dest):
         super(GitSource, self).clean(root, dest)
-        rc, branches = util.cmd_out('git branch -l', env=self.env)
+        _, branches = util.cmd_out('git branch -l', env=self.env)
         if 'inhibitor' in branches:
             util.cmd('git checkout master', env=self.env, chdir=self.cachedir)
             util.cmd('git branch -D inhibitor', env=self.env)
@@ -326,6 +335,65 @@ class GitSource(_GenericSource):
             % (self.rev, tarpath),
             env=self.env, chdir=self.cachedir)
         return tarpath
+
+
+class InhibitorScript(InhibitorSource):
+    def __init__(self, name, src, args = None, needs=[]):
+        super(InhibitorScript, self).__init__(
+            src,
+            dest = util.Path('/tmp/inhibitor/sh').pjoin(name),
+            name = name,
+            keep = False)
+        if args != None:
+            if type(args) == types.StringType:
+                self.args = args.split(" ")
+            elif type(args) == types.ListType:
+                self.args = args
+            else:
+                raise util.InhibitorError("Arguments to script %s are not a string or list" % name)
+        else:
+            self.args = []
+
+        self.reqs = []
+        for need in needs:
+            need.dest = util.Path('/tmp/inhibitor/sh').pjoin(os.path.basename(need.src))
+            need.keep = False
+            self.reqs.append(need)
+
+    def post_conf(self, inhibitor_state):
+        super(InhibitorScript, self).post_conf(inhibitor_state)
+        for req in self.reqs:
+            req.post_conf(inhibitor_state)
+    
+    def install(self):
+        super(InhibitorScript, self).install()
+        os.chmod(self.istate.paths.chroot.pjoin(self.dest), 0755)
+        for req in self.reqs:
+            req.install()
+
+
+    def run(self, chroot):
+        cmd = 'chroot %s /tmp/inhibitor/sh/%s' % (chroot, self.name)
+        if self.args:
+            for arg in self.args:
+                cmd += " '%s'" % (arg,)
+        env = {
+            'INHIBITOR_SCRIPT_ROOT':'/tmp/inhibitor/sh'
+        }
+        try:
+            util.cmd(cmd, env=env)
+        except (KeyboardInterrupt, SystemExit):
+            util.info("Caught SIGTERM or SIGINT:  Waiting for children to die")
+            # XXX:  Hacky.
+            time.sleep(5)
+            util.umount_all(self.istate.mount_points)
+            raise util.InhibitorError("Caught KeyboardInterrupt or SystemExit")
+        except Exception, e:
+            util.umount_all(self.istate.mount_points)
+            raise util.InhibitorError(str(e))
+
+
+
 
 
 
