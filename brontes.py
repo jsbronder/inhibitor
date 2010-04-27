@@ -1,18 +1,18 @@
 import inhibitor
 import util
 from actions import CreateSnapshotAction
-from source import InhibitorSource
+from source import (InhibitorSource, InhibitorScript)
 from actions import InhibitorStage4
 
 
 
 def get_make_conf(conf):
     if conf['system_type'] == 'amd64':
-        _cflags='-O2 -march=athlon64 -pipe -fomit-frame-pointer'
+        _cflags = '-O2 -march=athlon64 -pipe -fomit-frame-pointer'
     elif conf['system_type'] == 'core2':
-        _cflags='-O2 -march=athlon64 -pipe -fomit-frame-pointer'
+        _cflags = '-O2 -march=athlon64 -pipe -fomit-frame-pointer'
     else:
-        raise InhibitorError("Unknown system_type:  '%s'" % system_type)
+        raise util.InhibitorError("Unknown system_type:  '%s'" % conf['system_type'])
 
     return """
         GENTOO_MIRRORS="http://mirror.mmm.com/ http://gentoo.osuosl.org/ http://distfiles.gentoo.org/"
@@ -58,7 +58,20 @@ def package_list():
         sys-devel/bc
         sys-apps/less
         app-misc/screen
+        media-gfx/splashutils
     """.split(' \n\t')
+
+def test_script(args):
+    return """
+        #!/bin/bash
+        echo "in Test script"
+        echo
+        env
+        echo $1
+        echo $2
+        echo $3
+        exit 0
+    """
 
 stageconf = util.Container(
     name            = 'cydonian',
@@ -75,7 +88,9 @@ stageconf = util.Container(
     make_conf       = InhibitorSource(get_make_conf, system_type='core2'),
     arch            = 'amd64',
     seed            = 'stage3-amd64-cydonian-early-openrc-core2-r1',
-    package_list    = package_list
+    package_list    = package_list,
+    scripts         = [InhibitorScript('test_script', test_script,
+        args=['one arg', '--somestuff="blah"', 'more'])],
 )
 
 
