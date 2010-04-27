@@ -1,9 +1,7 @@
 import os
 import shutil
 import time
-#from source import InhibitorSource
 import util
-import source
 
 class InhibitorAction(object):
     """
@@ -60,6 +58,12 @@ class InhibitorStage(InhibitorAction):
         self.ex_cxxflags    = []
         self.ex_features    = []
         self.ex_overlays    = []
+        self.ex_mounts      = []
+        self.builddir       = None
+        self.seed           = None
+        self.pkgdir         = util.Path('/tmp/inhibitor/pkgs')
+        self.distdir        = util.Path('/tmp/inhibitor/dist')
+        self.sh_scripts     = ['inhibitor-run.sh', 'inhibitor-functions.sh']
 
         if self.conf.has('snapshot'):
             self.conf.snapshot.keep = False
@@ -93,20 +97,19 @@ class InhibitorStage(InhibitorAction):
         self.istate     = inhibitor_state
         self.builddir   = self.istate.paths.build.pjoin(self.build_name)
         self.seed       = self.istate.paths.stages.pjoin(self.conf.seed)
-        self.distdir    = self.istate.paths.dist
 
         # Update state
         self.istate.paths.chroot = self.builddir
 
         pkgdir          = self.istate.paths.pkgs.pjoin(self.build_name)
         distdir         = self.istate.paths.dist
-        self.pkg_mount  = util.Mount(pkgdir, '/tmp/inhibitor/pkgs', self.builddir)
-        self.dist_mount = util.Mount(distdir, '/tmp/inhibitor/dist', self.builddir)
-        for d in (pkgdir, distdir):
-            if not os.path.exists(d):
-                util.dbg("Creating %s" % (d,))
-                os.makedirs(d)
 
+        for i in ('/proc', '/sys', '/dev'):
+            self.ex_mounts.append(util.Mount(i, i, self.builddir))
+        
+        self.ex_mounts.append(util.Mount(pkgdir, self.pkgdir, self.builddir))
+        self.ex_mounts.append(util.Mount(distdir, self.distdir, self.builddir))
+        
         for src in self.sources:
             src.post_conf(inhibitor_state)
 
@@ -169,8 +172,8 @@ class InhibitorStage(InhibitorAction):
             if not v in makeconf['PORTDIR_OVERLAY']:
                 makeconf['PORTDIR_OVERLAY'] += ' ' + v
 
-        makeconf['PKGDIR'] = self.pkg_mount.dest
-        makeconf['DISTDIR'] = self.dist_mount.dest
+        makeconf['PKGDIR']  = self.pkgdir
+        makeconf['DISTDIR'] = self.distdir
 
         for k in makeconf.keys():
             if makeconf[k] == "":
@@ -182,21 +185,20 @@ class InhibitorStage(InhibitorAction):
 
     def setup_chroot(self):
         dest = self.builddir.pjoin('tmp/inhibitor')
-        if not os.path.isdir(dest):
-            os.mkdir(dest)
+        if not os.path.isdir(dest.pjoin('sh')):
+            os.makedirs(dest.pjoin('sh'))
 
         for f in ('/etc/hosts', '/etc/resolv.conf'):
             shutil.copyfile(f, self.builddir.pjoin(f))
 
-        for f in ('inhibitor-run.sh', 'inhibitor-functions.sh'):
+        for f in self.sh_scripts:
             shutil.copy(self.istate.paths.share.pjoin('sh/'+f), dest)
 
-        for m in ('/proc', '/dev', '/sys'):
-            mount = util.Mount(m, m, self.builddir)
-            util.mount(mount, self.istate.mount_points)
-
-        util.mount(self.pkg_mount, self.istate.mount_points)
-        util.mount(self.dist_mount, self.istate.mount_points)
+        for m in self.ex_mounts:
+            if not os.path.isdir(m.src):
+                util.warn("Creating %s, required for a bind mount.")
+                os.makedirs(m.src)
+            util.mount(m, self.istate.mount_points)
 
     def chroot(self):
         try:
@@ -228,11 +230,25 @@ class InhibitorStage(InhibitorAction):
 class InhibitorStage4(InhibitorStage):
     def __init__(self, stage_conf, build_name):
         super(InhibitorStage4, self).__init__(stage_conf, build_name, stage_name='stage4')
+        self.kerndir = util.Path('/tmp/inhibitor/kernel')
+        self.sh_scripts.append('kernel.sh')
         
         if self.conf.has('package_list'):
             self.packages = self.conf.package_list()
         else:
             self.packages = ['system']
+
+        self.scripts = []
+        if self.conf.has('scripts'):
+            self.scripts = self.conf.scripts
+
+    def post_conf(self, inhibitor_state):
+        super(InhibitorStage4, self).post_conf(inhibitor_state)
+        for script in self.scripts:
+            script.post_conf(inhibitor_state)
+
+        kerndir = self.istate.paths.kernel.pjoin(self.build_name)
+        self.ex_mounts.append(util.Mount(kerndir, self.kerndir, self.builddir))
 
     def setup_chroot(self):
         super(InhibitorStage4, self).setup_chroot()
@@ -240,6 +256,12 @@ class InhibitorStage4(InhibitorStage):
         for pkg in self.packages:
             f.write('%s\n' %(pkg,))
         f.close()
+
+    def chroot(self):
+        super(InhibitorStage4, self).chroot()
+        for script in self.scripts:
+            script.install()
+            script.run(self.builddir)
 
 
 

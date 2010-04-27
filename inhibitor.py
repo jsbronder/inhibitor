@@ -21,6 +21,7 @@ class InhibitorState(object):
             build       = util.Path('/var/tmp/inhibitor/%s/build'  % __version__),
             pkgs        = util.Path('/var/tmp/inhibitor/%s/pkgs'   % __version__),
             dist        = util.Path('/var/tmp/inhibitor/%s/dist'   % __version__),
+            kernel      = util.Path('/var/tmp/inhibitor/%s/kernel' % __version__),
             share       = util.Path(os.path.abspath(os.curdir))
         )
 
