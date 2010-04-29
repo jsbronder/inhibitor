@@ -91,6 +91,12 @@ stageconf = util.Container(
     package_list    = package_list,
     scripts         = [InhibitorScript('test_script', test_script,
         args=['one arg', '--somestuff="blah"', 'more'])],
+    kernel          = util.Container(
+        kernel_pkg  = '=sys-kernel/brontes-sources-2.6.32',
+        kconfig     = 'kconfig-2.6.32',
+        gk_args     = '--splash=Brontes',
+        packages    = 'x11-drivers/nvidia-drivers media-gfx/splash-themes-brontes'
+    )
 )
 
 

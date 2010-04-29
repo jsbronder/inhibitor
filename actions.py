@@ -49,7 +49,7 @@ class InhibitorStage(InhibitorAction):
         self.action_sequence = [
             'get_sources',  'unpack_seed',      'sync_sources',
             'profile_link', 'write_make_conf',  'setup_chroot',
-            'chroot',       'clean_sources','cleanup'
+            'chroot',       'clean_sources',    'cleanup'
         ]
         self.sources = []
         self.stage_name = stage_name
@@ -230,7 +230,14 @@ class InhibitorStage(InhibitorAction):
 class InhibitorStage4(InhibitorStage):
     def __init__(self, stage_conf, build_name):
         super(InhibitorStage4, self).__init__(stage_conf, build_name, stage_name='stage4')
-        self.kerndir = util.Path('/tmp/inhibitor/kernel')
+        self.action_sequence = [
+            'get_sources',  'unpack_seed',      'sync_sources',
+            'profile_link', 'write_make_conf',  'setup_chroot',
+            'chroot',       'install_kernel',   'clean_sources',
+            'cleanup'
+        ]
+
+        self.kerndir = util.Path('/tmp/inhibitor/kerncache')
         self.sh_scripts.append('kernel.sh')
         
         if self.conf.has('package_list'):
@@ -241,6 +248,13 @@ class InhibitorStage4(InhibitorStage):
         self.scripts = []
         if self.conf.has('scripts'):
             self.scripts = self.conf.scripts
+
+        if self.conf.has('kernel'):
+            self.kernel = self.conf.kernel
+            if not self.kernel.has('kconfig'):
+                raise util.InhibitorError("No kconfig specified for kernel")
+            elif not self.kernel.has('kernel_pkg'):
+                raise util.InhibitorError("No kernel_pkg specified for kernel")
 
     def post_conf(self, inhibitor_state):
         super(InhibitorStage4, self).post_conf(inhibitor_state)
@@ -256,14 +270,37 @@ class InhibitorStage4(InhibitorStage):
         for pkg in self.packages:
             f.write('%s\n' %(pkg,))
         f.close()
+        shutil.copy(self.kernel.kconfig, self.builddir.pjoin('tmp/inhibitor/kconfig'))
 
     def chroot(self):
         super(InhibitorStage4, self).chroot()
         for script in self.scripts:
             script.install()
-            script.run(self.builddir)
+            script.run( chroot=self.builddir )
 
+    def install_kernel(self):
+        args = ['--build_name', self.build_name,
+            '--kernel_pkg', self.kernel.kernel_pkg]
 
+        if self.kernel.has('gk_args'):
+            args.extend(['--gk_args', self.kernel.gk_args])
+        if self.kernel.has('packages'):
+            args.extend(['--packages', self.kernel.packages])
+
+        try:
+            util.cmd('chroot %s /tmp/inhibitor/kernel.sh %s'
+                % (self.builddir, ' '.join(args)) )
+        except (KeyboardInterrupt, SystemExit):
+            util.info("Caught SIGTERM or SIGINT:  Waiting for children to die")
+            # XXX:  Hacky.
+            time.sleep(5)
+            util.umount_all(self.istate.mount_points)
+            raise util.InhibitorError("Caught KeyboardInterrupt or SystemExit")
+        except Exception, e:
+            util.umount_all(self.istate.mount_points)
+            raise util.InhibitorError(str(e))
+
+        
 
 
 
