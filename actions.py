@@ -14,21 +14,25 @@ class InhibitorAction(object):
         self.name = name
         self.action_sequence = []
 
+    def get_action_sequence(self):
+        return []
+
     def post_conf(self, inhibitor_state):
         pass
 
     def run(self):
-        for action in self.action_sequence:
+        for action in self.get_action_sequence():
             # Errors are caught by Inhibitor()
-            util.dbg("Running %s" % action)
-            func = getattr(self, action)
-            func()
+            util.dbg("Running %s" % action.func_name)
+            action()
 
 class CreateSnapshotAction(InhibitorAction):
     def __init__(self, snapshot_source):
         super(CreateSnapshotAction, self).__init__('mksnapshot')
         self.src = snapshot_source
-        self.action_sequence = ['fetch', 'pack']
+
+    def get_action_sequence(self):
+        return [self.fetch, self.pack]
 
     def post_conf(self, inhibitor_state):
         self.src.post_conf(inhibitor_state)
@@ -46,11 +50,16 @@ class InhibitorStage(InhibitorAction):
         super(InhibitorStage, self).__init__('stage')
         self.conf   = stage_conf
         self.istate = None
-        self.action_sequence = [
-            'get_sources',  'unpack_seed',      'sync_sources',
-            'profile_link', 'write_make_conf',  'setup_chroot',
-            'chroot',       'clean_sources',    'cleanup'
+
+        self.setup_sequence = [
+            self.get_sources,    self.unpack_seed,       self.sync_sources,
+            self.profile_link,  self.write_make_conf,   self.setup_chroot
         ]
+
+        self.cleanup_sequence = [
+            self.clean_sources, self.cleanup
+        ]
+        
         self.sources = []
         self.stage_name = stage_name
         self.build_name = '%s-%s' %  (stage_name, build_name)
@@ -92,6 +101,11 @@ class InhibitorStage(InhibitorAction):
             self.ex_cflags.extend(['-O2', '-pipe'])
             self.ex_cxxflags.extend(['-O2', '-pipe'])
 
+    def get_action_sequence(self):
+        ret = self.setup_sequence[:]
+        ret.append(self.chroot)
+        ret.extend(self.cleanup_sequence)
+        return ret
                
     def post_conf(self, inhibitor_state):
         self.istate     = inhibitor_state
@@ -230,12 +244,6 @@ class InhibitorStage(InhibitorAction):
 class InhibitorStage4(InhibitorStage):
     def __init__(self, stage_conf, build_name):
         super(InhibitorStage4, self).__init__(stage_conf, build_name, stage_name='stage4')
-        self.action_sequence = [
-            'get_sources',  'unpack_seed',      'sync_sources',
-            'profile_link', 'write_make_conf',  'setup_chroot',
-            'chroot',       'install_kernel',   'clean_sources',
-            'cleanup'
-        ]
 
         self.kerndir = util.Path('/tmp/inhibitor/kerncache')
         self.sh_scripts.append('kernel.sh')
@@ -255,6 +263,12 @@ class InhibitorStage4(InhibitorStage):
                 raise util.InhibitorError("No kconfig specified for kernel")
             elif not self.kernel.has('kernel_pkg'):
                 raise util.InhibitorError("No kernel_pkg specified for kernel")
+
+    def get_action_sequence(self):
+        ret = self.setup_sequence[:]
+        ret.extend([self.chroot, self.install_kernel])
+        ret.extend(self.cleanup_sequence)
+        return ret
 
     def post_conf(self, inhibitor_state):
         super(InhibitorStage4, self).post_conf(inhibitor_state)
