@@ -22,14 +22,9 @@ install_kernel() {
     ln -snf System.map-${KERNEL_RELEASE} ${KROOT}/boot/System.map
     rm -f ${KROOT}/boot/config-${KERNEL_RELEASE}
     einfo "Installing modules"
-    # To make sure that depmod doesn't run as it will fail due
-    # to the use of a non-standard MODLIB
-    mv System.map{,.bkup}
-#        MODLIB=${KROOT}/lib/modules/${KERNEL_RELEASE} \
     make \
         INSTALL_MOD_PATH=${KROOT} \
         modules_install                                             || die "Kernel module install failed"
-    mv System.map{.bkup,}
     popd &>/dev/null
 }
 
