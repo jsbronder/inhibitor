@@ -266,7 +266,7 @@ class InhibitorStage4(InhibitorStage):
 
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
-        ret.extend([self.chroot, self.install_kernel])
+        ret.extend([self.chroot, self.install_kernel, self.run_scripts])
         ret.extend(self.cleanup_sequence)
         return ret
 
@@ -288,9 +288,6 @@ class InhibitorStage4(InhibitorStage):
 
     def chroot(self):
         super(InhibitorStage4, self).chroot()
-        for script in self.scripts:
-            script.install()
-            script.run( chroot=self.builddir )
 
     def install_kernel(self):
         args = ['--build_name', self.build_name,
@@ -314,7 +311,11 @@ class InhibitorStage4(InhibitorStage):
             util.umount_all(self.istate.mount_points)
             raise util.InhibitorError(str(e))
 
-        
+    def run_scripts(self):        
+        for script in self.scripts:
+            script.install()
+            script.run( chroot=self.builddir )
+
 
 
 
