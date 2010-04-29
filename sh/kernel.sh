@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /tmp/inhibitor/inhibitor-functions.sh || exit 1
+source /tmp/inhibitor/sh/inhibitor-functions.sh || exit 1
 
 
 install_kernel() {

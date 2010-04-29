@@ -206,7 +206,7 @@ class InhibitorStage(InhibitorAction):
             shutil.copyfile(f, self.builddir.pjoin(f))
 
         for f in self.sh_scripts:
-            shutil.copy(self.istate.paths.share.pjoin('sh/'+f), dest)
+            shutil.copy(self.istate.paths.share.pjoin('sh/'+f), dest.pjoin('sh'))
 
         for m in self.ex_mounts:
             if not os.path.isdir(m.src):
@@ -216,7 +216,7 @@ class InhibitorStage(InhibitorAction):
 
     def chroot(self):
         try:
-            util.cmd('chroot %s /tmp/inhibitor/inhibitor-run.sh run_%s' 
+            util.cmd('chroot %s /tmp/inhibitor/sh/inhibitor-run.sh run_%s' 
                 % (self.builddir, self.stage_name))
         except (KeyboardInterrupt, SystemExit):
             util.info("Caught SIGTERM or SIGINT:  Waiting for children to die")
@@ -302,7 +302,7 @@ class InhibitorStage4(InhibitorStage):
             args.extend(['--packages', self.kernel.packages])
 
         try:
-            util.cmd('chroot %s /tmp/inhibitor/kernel.sh %s'
+            util.cmd('chroot %s /tmp/inhibitor/sh/kernel.sh %s'
                 % (self.builddir, ' '.join(args)) )
         except (KeyboardInterrupt, SystemExit):
             util.info("Caught SIGTERM or SIGINT:  Waiting for children to die")

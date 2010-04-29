@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /tmp/inhibitor
+cd /tmp/inhibitor/sh
 
 if ! source ./inhibitor-functions.sh; then
     echo
