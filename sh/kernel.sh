@@ -85,7 +85,7 @@ install_initramfs() {
   
     einfo "Building and installing initramfs"
     /usr/bin/genkernel ${GK_ARGS} \
-        --kernname=${KPN%-sources-*} \
+        --kernname=${KPN%-sources} \
         --kerneldir=${KROOT}/usr/src/linux-${KERNEL_RELEASE} \
         --tempdir=${KCACHE}/gk-tmp \
         --cachedir=${KCACHE}/gk-cache \
@@ -134,18 +134,20 @@ cached() {
 init() {
     _init
     einfo "Preparing to build and install the kernel"
+    local kpkg=$(portageq best_visible / ${KERNEL_PKG})
     local vers="$(printf "%s\n%s\n%s\n" \
             "import portage" \
-            "a = portage.catpkgsplit('${KERNEL_PKG}')" \
-            "print a[2], a[3]" | python )"
-    KERNEL_V=${vers% *}
-    KERNEL_RV=${vers#* }
-    KPN=${KERNEL_PKG#*/}
+            "a = portage.catpkgsplit('${kpkg}')" \
+            "print a[1], a[2], a[3]" | python )"
+    KPN=${vers%% *}
+    KERNEL_RV=${vers##* }
+    KERNEL_V=${vers#* }
+    KERNEL_V=${KERNEL_V% *}
     if [ "${KERNEL_RV}" == "r0" ]; then
         KERNEL_RV=""
-        KERNEL_RELEASE="${KERNEL_V}-${KPN%-sources-*}"
+        KERNEL_RELEASE="${KERNEL_V}-${KPN%-sources}"
     else
-        KERNEL_RELEASE="${KERNEL_V}-${KPN%-sources-*}-${KERNEL_RV}"
+        KERNEL_RELEASE="${KERNEL_V}-${KPN%-sources}-${KERNEL_RV}"
     fi
 
     KROOT="/tmp/inhibitor/kerncache/${BUILD_NAME}/${KERNEL_RELEASE}/root"
