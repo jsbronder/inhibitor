@@ -115,16 +115,16 @@ create_tarball() {
 }
 
 cached() {
-    local tarpath=${KCACHE}/${KPN}.tar.bz2
+    local tarpath=${KCACHE}/${KERNEL_RELEASE}.tar.bz2
 
     [ -f ${KCACHE}/kconfig ] || return 1
+
     cmp ${KERNEL_KCONFIG} ${KCACHE}/kconfig \
         &>/dev/null || return 1
 
     [ -f ${KCACHE}/tarhash ] || return 1
-    
     [ -f ${tarpath} ] || return 1
-
+    
     sha512sum ${tarpath} \
         | cut -d' ' -f 1 \
         > ${KROOT}/.newhash
@@ -197,8 +197,8 @@ init
 if ! cached; then
     einfo "No cached kernel build found..."
     install_kernel 
-    post_kern_merge
     install_initramfs
     create_tarball
 fi
 install_tarball
+post_kern_merge
