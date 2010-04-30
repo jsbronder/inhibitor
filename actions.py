@@ -261,7 +261,11 @@ class InhibitorStage4(InhibitorStage):
             self.kernel = self.conf.kernel
             if not self.kernel.has('kconfig'):
                 raise util.InhibitorError("No kconfig specified for kernel")
-            elif not self.kernel.has('kernel_pkg'):
+            else:
+                self.kernel.kconfig.keep = True
+                self.kernel.kconfig.dest = util.Path('/tmp/inhibitor/kconfig')
+                self.sources.append(self.kernel.kconfig)
+            if not self.kernel.has('kernel_pkg'):
                 raise util.InhibitorError("No kernel_pkg specified for kernel")
 
     def get_action_sequence(self):
@@ -284,7 +288,6 @@ class InhibitorStage4(InhibitorStage):
         for pkg in self.packages:
             f.write('%s\n' %(pkg,))
         f.close()
-        shutil.copy(self.kernel.kconfig, self.builddir.pjoin('tmp/inhibitor/kconfig'))
 
     def chroot(self):
         super(InhibitorStage4, self).chroot()
