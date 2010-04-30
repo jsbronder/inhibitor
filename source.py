@@ -75,8 +75,8 @@ class InhibitorSource(object):
         self._check()
         if self.dest == None:
             return
-        if not self.fetched:
-            self.fetch()
+#        if not self.fetched:
+#            self.fetch()
         self.backend.install(self.istate.paths.chroot, self.dest)
         
 
@@ -239,6 +239,10 @@ class FuncSource(_GenericSource):
  
     def install(self, root, dest):
         nkeys = None
+        if self.output == None:
+            # In case we're resuming a build where the fetch step was skipped.
+            self.fetch()
+
         if type(self.output) == types.DictType:
             nkeys = len(self.output.keys())
 

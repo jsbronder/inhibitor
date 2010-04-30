@@ -2,6 +2,16 @@ import os
 import shutil
 import time
 import util
+import glob
+
+class Step(util.Container):
+    def __init__(self, function, always=True, **keywds):
+        super(Step, self).__init__(function=function, always=always, **keywds)
+        self.name = function.func_name
+
+    def run(self):
+        self.function()
+
 
 class InhibitorAction(object):
     """
@@ -10,31 +20,57 @@ class InhibitorAction(object):
 
     @param name     - String representing this action
     """
-    def __init__(self, name='BlankAction'):
+    def __init__(self, name='BlankAction', resume=False):
         self.name = name
         self.action_sequence = []
+        self.resume = resume
+        self.statedir = None
 
     def get_action_sequence(self):
         return []
 
     def post_conf(self, inhibitor_state):
-        pass
+        self.statedir = inhibitor_state.paths.state.pjoin(self.name)
+        if os.path.isdir(self.statedir) and not self.resume:
+            self.clear_resume()
+        elif not os.path.exists(self.statedir):
+            os.makedirs(self.statedir)
+            self.resume = False
+        elif len(os.listdir(self.statedir)) == 0:
+            self.resume = False
 
     def run(self):
         for action in self.get_action_sequence():
+            resume_path = self.statedir.pjoin('resume-%s-%s' % (self.name, action.name))
+            if ( self.resume 
+                    and action.always == False 
+                    and os.path.exists(resume_path) ):
+                continue
             # Errors are caught by Inhibitor()
-            util.dbg("Running %s" % action.func_name)
-            action()
+            util.info("Running %s" % action.name)
+            action.run()
+            open(resume_path, 'w').close()
+        self.clear_resume()
+
+    def clear_resume(self):
+        for f in glob.iglob(self.statedir.pjoin('resume-%s-*' % self.name)):
+            os.unlink(f)
+        os.rmdir(self.statedir)
+
 
 class CreateSnapshotAction(InhibitorAction):
-    def __init__(self, snapshot_source):
-        super(CreateSnapshotAction, self).__init__('mksnapshot')
+    def __init__(self, snapshot_source, **keywds):
+        super(CreateSnapshotAction, self).__init__('snapshot-%s' % (snapshot_source.name,), **keywds)
         self.src = snapshot_source
 
     def get_action_sequence(self):
-        return [self.fetch, self.pack]
+        return [
+            Step(self.fetch,    always=False),
+            Step(self.pack,     always=False),
+        ]
 
     def post_conf(self, inhibitor_state):
+        super(CreateSnapshotAction, self).post_conf(inhibitor_state)
         self.src.post_conf(inhibitor_state)
 
     def fetch(self):
@@ -46,23 +82,29 @@ class CreateSnapshotAction(InhibitorAction):
 
 
 class InhibitorStage(InhibitorAction):
-    def __init__(self, stage_conf, build_name, stage_name='generic_stage'):
-        super(InhibitorStage, self).__init__('stage')
+    def __init__(self, stage_conf, build_name, stage_name='generic_stage', **keywds):
+        self.build_name = '%s-%s' %  (stage_name, build_name)
+        super(InhibitorStage, self).__init__(self.build_name, **keywds)
+
         self.conf   = stage_conf
         self.istate = None
 
         self.setup_sequence = [
-            self.get_sources,    self.unpack_seed,       self.sync_sources,
-            self.profile_link,  self.write_make_conf,   self.setup_chroot
+            Step(self.get_sources,      always=False),
+            Step(self.unpack_seed,      always=False),
+            Step(self.sync_sources,     always=True),
+            Step(self.profile_link,     always=False),
+            Step(self.write_make_conf,  always=False),
+            Step(self.setup_chroot,     always=True),
         ]
 
         self.cleanup_sequence = [
-            self.clean_sources, self.cleanup
+            Step(self.clean_sources,    always=True),
+            Step(self.cleanup,          always=True),
         ]
         
         self.sources = []
         self.stage_name = stage_name
-        self.build_name = '%s-%s' %  (stage_name, build_name)
         self.ex_cflags      = []
         self.ex_cxxflags    = []
         self.ex_features    = []
@@ -108,6 +150,7 @@ class InhibitorStage(InhibitorAction):
         return ret
                
     def post_conf(self, inhibitor_state):
+        super(InhibitorStage, self).post_conf(inhibitor_state)
         self.istate     = inhibitor_state
         self.builddir   = self.istate.paths.build.pjoin(self.build_name)
         self.seed       = self.istate.paths.stages.pjoin(self.conf.seed)
@@ -150,6 +193,8 @@ class InhibitorStage(InhibitorAction):
 
     def sync_sources(self):
         for src in self.sources:
+            if self.resume and src.keep:
+                continue
             src.install()
 
     def profile_link(self):
@@ -242,8 +287,8 @@ class InhibitorStage(InhibitorAction):
 
 
 class InhibitorStage4(InhibitorStage):
-    def __init__(self, stage_conf, build_name):
-        super(InhibitorStage4, self).__init__(stage_conf, build_name, stage_name='stage4')
+    def __init__(self, stage_conf, build_name, **keywds):
+        super(InhibitorStage4, self).__init__(stage_conf, build_name, stage_name='stage4', **keywds)
 
         self.kerndir = util.Path('/tmp/inhibitor/kerncache')
         self.sh_scripts.append('kernel.sh')
@@ -270,7 +315,11 @@ class InhibitorStage4(InhibitorStage):
 
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
-        ret.extend([self.chroot, self.install_kernel, self.run_scripts])
+        ret.extend([
+            Step(self.chroot,           always=False),
+            Step(self.install_kernel,   always=False),
+            Step(self.run_scripts,      always=False)
+        ])
         ret.extend(self.cleanup_sequence)
         return ret
 
@@ -318,14 +367,4 @@ class InhibitorStage4(InhibitorStage):
         for script in self.scripts:
             script.install()
             script.run( chroot=self.builddir )
-
-
-
-
-
-
-
-
-
-
 
