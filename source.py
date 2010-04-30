@@ -155,6 +155,8 @@ class _GenericSource(object):
         # It's a file, always copy from source.
         if not self.src_is_dir:
             util.dbg("Copying %s to %s" % (self.src, full_dest))
+            if not os.path.isdir( os.path.dirname(full_dest) ):
+                os.makedirs(os.path.dirname(full_dest))
             shutil.copy(self.src, full_dest)
         else:
             # If we're keeping this, there was no reason to create a cache,
