@@ -355,6 +355,8 @@ class InhibitorScript(InhibitorSource):
             self.args = []
 
         self.reqs = []
+        if type(needs) == InhibitorSource:
+            needs = [needs]
         for need in needs:
             need.dest = util.Path('/tmp/inhibitor/sh').pjoin(os.path.basename(need.src))
             need.keep = False
