@@ -33,6 +33,7 @@ class InhibitorAction(object):
         self.statedir = inhibitor_state.paths.state.pjoin(self.name)
         if os.path.isdir(self.statedir) and not self.resume:
             self.clear_resume()
+            os.makedirs(self.statedir)
         elif not os.path.exists(self.statedir):
             os.makedirs(self.statedir)
             self.resume = False
@@ -239,7 +240,7 @@ class InhibitorStage(InhibitorAction):
 
         for m in self.ex_mounts:
             if not os.path.isdir(m.src):
-                util.warn("Creating %s, required for a bind mount.")
+                util.warn("Creating %s, required for a bind mount." % (m.src,))
                 os.makedirs(m.src)
             util.mount(m, self.istate.mount_points)
 
@@ -272,7 +273,10 @@ class InhibitorStage(InhibitorAction):
 
 class InhibitorStage4(InhibitorStage):
     def __init__(self, stage_conf, build_name, **keywds):
-        super(InhibitorStage4, self).__init__(stage_conf, build_name, stage_name='stage4', **keywds)
+        if not 'stage_name' in keywds.keys():
+            super(InhibitorStage4, self).__init__(stage_conf, build_name, stage_name='stage4', **keywds)
+        else:
+            super(InhibitorStage4, self).__init__(stage_conf, build_name, **keywds)
 
         self.kerndir = util.Path('/tmp/inhibitor/kerncache')
         self.sh_scripts.append('kernel.sh')
@@ -299,11 +303,10 @@ class InhibitorStage4(InhibitorStage):
 
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
-        ret.extend([
-            Step(self.chroot,           always=False),
-            Step(self.install_kernel,   always=False),
-            Step(self.run_scripts,      always=False)
-        ])
+        ret.append( Step(self.chroot,               always=False) )
+        if self.conf.has('kernel'):
+            ret.append( Step(self.install_kernel,   always=False) )
+        ret.append( Step(self.run_scripts,          always=False) )
         ret.extend(self.cleanup_sequence)
         return ret
 
