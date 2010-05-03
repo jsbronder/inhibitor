@@ -220,7 +220,7 @@ class FuncSource(_GenericSource):
     def _write_dictionary(self, destdir, d):
         for k,v in d.items():
             if type(v) == types.StringType:
-                self._write_file(destdir.join(k), v)
+                self._write_file(destdir.pjoin(k), v)
             else:
                 os.makedirs(destdir.pjoin(k))
                 self._write_dictionary(destdir.pjoin(k), v)
@@ -232,6 +232,8 @@ class FuncSource(_GenericSource):
         # in the return dictionary with correct python indentation.
         b = value.lstrip('\n\t ')
         strip = len(value) - len(b) - 1
+        if strip < 0:
+            strip = 0
         f = open(path, 'w')
         for line in value.splitlines():
             f.write(line[strip:]+'\n')
@@ -243,19 +245,23 @@ class FuncSource(_GenericSource):
             # In case we're resuming a build where the fetch step was skipped.
             self.fetch()
 
+        realdest = root.pjoin(dest)
+        if not os.path.exists( os.path.dirname(realdest) ):
+            os.makedirs(realdest)
+
         if type(self.output) == types.DictType:
             nkeys = len(self.output.keys())
 
         if type(self.output) == types.StringType:
-            util.dbg("Writing string output to %s" % (root.pjoin(dest)))
-            self._write_file(root.pjoin(dest), self.output)
-        elif nkeys == 1:
-            util.dbg("Writing singleton dictionary output to %s" % (root.pjoin(dest)))
-            k = self.output.keys()[0]
-            self._write_file(root.pjoin(dest), self.output[k])
+            util.dbg("Writing string output to %s" % (realdest,))
+            if not os.path.exists( os.path.dirname(realdest) ):
+                os.makedirs(realdest)
+            self._write_file(realdest, self.output)
         else:
-            util.dbg("Writing dictionary output to %s" % (root.pjoin(dest)))
-            self._write_dictionary(root.join(dest), self.output)
+            util.dbg("Writing dictionary output to %s" % (realdest,))
+            if not os.path.exists(realdest):
+                os.makedirs(realdest)
+            self._write_dictionary(realdest, self.output)
          
 
 class GitSource(_GenericSource):
