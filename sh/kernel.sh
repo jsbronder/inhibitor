@@ -34,7 +34,7 @@ post_kern_merge() {
         POST_KERN_PKGS=""
     fi
 
-    for i in ${GK_ARGS}; do
+    for i in ${GENKERNEL}; do
         case "${i}" in
             --splash=*)
                 POST_KERN_PKGS="${POST_KERN_PKGS} media-gfx/splashutils"
@@ -84,7 +84,7 @@ install_initramfs() {
     fi
   
     einfo "Building and installing initramfs"
-    /usr/bin/genkernel ${GK_ARGS} \
+    /usr/bin/genkernel ${GENKERNEL} \
         --kernname=${KPN%-sources} \
         --kerneldir=${KROOT}/usr/src/linux-${KERNEL_RELEASE} \
         --tempdir=${KCACHE}/gk-tmp \
@@ -173,6 +173,7 @@ install_tarball() {
     fi
 }
 
+GENKERNEL=""
 while [ $# -gt 0 ]; do
     case $1 in
         --build_name)
@@ -181,8 +182,8 @@ while [ $# -gt 0 ]; do
         --kernel_pkg)
             shift;KERNEL_PKG=${1}
             ;;
-        --gk_args)
-            shift;GK_ARGS=${1}
+        --genkernel)
+            shift;GENKERNEL=${1}
             ;;
         --packages)
             shift;POST_KERN_PKGS=${1}
@@ -199,7 +200,7 @@ init
 if ! cached; then
     einfo "No cached kernel build found..."
     install_kernel 
-    install_initramfs
+    [ -n "${GENKERNEL}" ] && install_initramfs
     create_tarball
 fi
 install_tarball

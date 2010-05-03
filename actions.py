@@ -329,8 +329,8 @@ class InhibitorStage4(InhibitorStage):
         args = ['--build_name', self.build_name,
             '--kernel_pkg', self.kernel.kernel_pkg]
 
-        if self.kernel.has('gk_args'):
-            args.extend(['--gk_args', self.kernel.gk_args])
+        if self.kernel.has('genkernel'):
+            args.extend(['--genkernel', self.kernel.genkernel])
         if self.kernel.has('packages'):
             args.extend(['--packages', self.kernel.packages])
 
