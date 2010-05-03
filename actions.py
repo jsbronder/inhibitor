@@ -105,15 +105,9 @@ class InhibitorStage(InhibitorAction):
         
         self.sources = []
         self.stage_name = stage_name
-        self.ex_cflags      = []
-        self.ex_cxxflags    = []
-        self.ex_features    = []
-        self.ex_overlays    = []
         self.ex_mounts      = []
         self.builddir       = None
         self.seed           = None
-        self.pkgdir         = util.Path('/tmp/inhibitor/pkgs')
-        self.distdir        = util.Path('/tmp/inhibitor/dist')
         self.sh_scripts     = ['inhibitor-run.sh', 'inhibitor-functions.sh']
 
         if self.conf.has('snapshot'):
@@ -121,6 +115,7 @@ class InhibitorStage(InhibitorAction):
             self.conf.snapshot.dest = util.Path('/usr/portage')
             self.sources.append(self.conf.snapshot)
 
+        portdir_overlay = []
         if self.conf.has('overlays'):
             i = 0
             for overlay in self.conf.overlays:
@@ -128,20 +123,27 @@ class InhibitorStage(InhibitorAction):
                 overlay.dest = util.Path('/usr/local/overlay-%d' % i)
                 i += 1
                 self.sources.append(overlay)
-                self.ex_overlays.append(overlay.dest)
+                portdir_overlay.append(overlay.dest)
 
         if self.conf.has('portage_conf'):
             self.conf.portage_conf.keep = True
             self.conf.portage_conf.dest = util.Path('/etc/portage')
             self.sources.append(self.conf.portage_conf)
 
+        self.ex_make_conf   = {
+            'PKGDIR':       '/tmp/inhibitor/pkgs/',
+            'DISTDIR':      '/tmp/inhibitor/dist/',
+        }
+        if len(portdir_overlay) > 0:
+            self.ex_make_conf['PORTDIR_OVERLAY'] = ' '.join(portdir_overlay)
+
         if self.conf.has('make_conf'):
             self.conf.make_conf.keep = True
             self.conf.make_conf.dest = util.Path('/etc/make.conf')
             self.sources.append(self.conf.make_conf)
         else:
-            self.ex_cflags.extend(['-O2', '-pipe'])
-            self.ex_cxxflags.extend(['-O2', '-pipe'])
+            self.ex_make_conf['CFLAGS']     = '-O2 -pipe'
+            self.ex_make_conf['CXXFLAGS']   = '-O2 -pipe'
 
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
@@ -164,8 +166,8 @@ class InhibitorStage(InhibitorAction):
         for i in ('/proc', '/sys', '/dev'):
             self.ex_mounts.append(util.Mount(i, i, self.builddir))
         
-        self.ex_mounts.append(util.Mount(pkgdir, self.pkgdir, self.builddir))
-        self.ex_mounts.append(util.Mount(distdir, self.distdir, self.builddir))
+        self.ex_mounts.append(util.Mount(pkgdir,  self.ex_make_conf['PKGDIR'],  self.builddir))
+        self.ex_mounts.append(util.Mount(distdir, self.ex_make_conf['DISTDIR'], self.builddir))
         
         for src in self.sources:
             src.post_conf(inhibitor_state)
@@ -205,38 +207,20 @@ class InhibitorStage(InhibitorAction):
             self.builddir.pjoin('/etc/make.profile'))
 
     def write_make_conf(self):  
-        need_keys = ['CFLAGS', 'CXXFLAGS', 'FEATURES', 'PORTDIR_OVERLAY']
         shutil.copyfile(
             self.builddir.pjoin('/etc/make.conf'),
             self.builddir.pjoin('/etc/make.conf.orig'))
 
         makeconf = util.make_conf_dict(self.builddir.pjoin('/etc/make.conf'))
-        for k in need_keys:
+        makeconf.update(self.ex_make_conf)
+
+        for k in self.ex_make_conf.keys():
             if not k in makeconf.keys():
-                makeconf[k] = ""
-
-        for v in self.ex_cflags:
-            if not v in makeconf['CFLAGS']:
-                makeconf['CFLAGS'] += ' ' + v
-
-        for v in self.ex_cxxflags:
-            if not v in makeconf['CXXFLAGS']:
-                makeconf['CXXFLAGS'] += ' ' + v
-
-        for v in self.ex_features:
-            if not v in makeconf['FEATURES']:
-                makeconf['FEATURES'] += ' ' + v
-
-        for v in self.ex_overlays:
-            if not v in makeconf['PORTDIR_OVERLAY']:
-                makeconf['PORTDIR_OVERLAY'] += ' ' + v
-
-        makeconf['PKGDIR']  = self.pkgdir
-        makeconf['DISTDIR'] = self.distdir
-
-        for k in makeconf.keys():
-            if makeconf[k] == "":
-                del(makeconf[k])
+                makeconf[k] = self.ex_make_conf[k]
+            else:
+                for v in self.ex_make_conf[k].split(' '):
+                    if not v in makeconf[k]:
+                        makeconf[k] += ' ' + v
         
         util.write_dict_bash(makeconf, self.builddir.pjoin('/etc/make.conf'))
         util.write_dict_bash(makeconf, self.builddir.pjoin('/etc/make.conf.inhibitor'))
