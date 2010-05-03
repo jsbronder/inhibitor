@@ -4,6 +4,8 @@ source /tmp/inhibitor/sh/inhibitor-functions.sh || exit 1
 
 
 install_kernel() {
+    local grub_install_hack=false
+
     ROOT=${KROOT} \
         USE=symlink \
         run_emerge -u --oneshot --nodeps ${KERNEL_PKG}
@@ -13,10 +15,17 @@ install_kernel() {
     make $(portageq envvar / MAKEOPTS)                              || die "Kernel build failed"
     einfo "Installing kernel"
 
-    which grub-install
-    ls -l /sbin/grub-install
-    echo $PATH
+    # mkboot (called by installkernel) likes grub-install to exist.
+    # XXX:  Fixed in sys-apps/debianutils-3.1.3
+    if [ ! -x /sbin/grub-install ]; then
+        touch /sbin/grub-install
+        chmod +x /sbin/grub-install
+        grub_install_hack=true
+    fi
+
     make INSTALL_PATH=${KROOT}/boot/ install                        || die "Kernel install failed"
+
+    ${grub_install_hack} && rm -f /sbin/grub-install
 
     ln -snf vmlinuz-${KERNEL_RELEASE} ${KROOT}/boot/kernel
     ln -snf System.map-${KERNEL_RELEASE} ${KROOT}/boot/System.map
