@@ -97,6 +97,10 @@ source_wrapper() {
     done
 }
 
+get_root() {
+    emerge --verbose --info 2>/dev/null | egrep '^ROOT=' | sed 's,ROOT="\([^"]*\)",\1,'
+}
+
 #########################################
 #   Testing Stage                       #
 #########################################
