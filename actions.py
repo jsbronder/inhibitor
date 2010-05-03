@@ -355,3 +355,11 @@ class InhibitorStage4(InhibitorStage):
             script.install()
             script.run( chroot=self.builddir )
 
+
+class InhibitorMinimalStage(InhibitorStage4):
+    def __init__(self, stage_conf, build_name, **keywds):
+        super(InhibitorMinimalStage, self).__init__(stage_conf, build_name, stage_name='minimal', **keywds)
+        self.newroot = '/%s-newroot/' % (self.build_name,)
+        self.ex_make_conf['ROOT'] = self.newroot
+        self.ex_make_conf['PORTAGE_CONFIGROOT'] = '/'
+

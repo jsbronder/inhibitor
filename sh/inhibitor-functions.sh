@@ -203,3 +203,17 @@ run_stage4(){
     _run_stage4
 }
 
+_run_minimal() {
+    local packages="$(</tmp/inhibitor/package_list)"
+    local root=$(get_root)
+    if [ -d /lib64 ]; then
+        mkdir -p ${root}usr/lib64 ${root}lib64 &>/dev/null
+        [ -h ${root}usr/lib ]   || ln -snf lib64 ${root}usr/lib
+        [ -h ${root}lib ]       || ln -snf lib64 ${root}lib
+    fi
+    run_emerge --oneshot --newuse ${packages}
+}
+
+run_minimal() {
+    _run_minimal
+}
