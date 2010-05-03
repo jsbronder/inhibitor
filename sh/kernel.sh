@@ -170,12 +170,13 @@ init() {
 
 install_tarball() {
     einfo "Installing cached kernel package"
-    tar -xjpf ${KCACHE}/${KERNEL_RELEASE}.tar.bz2 -C / \
+    local d=$(get_root)
+    tar -xjpf ${KCACHE}/${KERNEL_RELEASE}.tar.bz2 -C ${d} \
         || die "Failed to install kernel tarball"
-    if [ -d /usr/src/linux-${KERNEL_RELEASE} ]; then
-        pushd /usr/src/linux-${KERNEL_RELEASE} &>/dev/null
-        cp /tmp/inhibitor/kconfig .config
-        cp /boot/System.map-${KERNEL_RELEASE} System.map    || die "Failed to copy System.map"
+    if [ -d ${d}usr/src/linux-${KERNEL_RELEASE} ]; then
+        pushd ${d}usr/src/linux-${KERNEL_RELEASE} &>/dev/null
+        cp ${d}tmp/inhibitor/kconfig .config
+        cp ${d}/boot/System.map-${KERNEL_RELEASE} System.map    || die "Failed to copy System.map"
         make modules_prepare                                || die "Failed to make modules_prepare"
         depmod ${KERNEL_RELEASE}                            || die "depmod ${KERNEL_RELEASE} failed"
         popd &>/dev/null
