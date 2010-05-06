@@ -159,13 +159,13 @@ init() {
         KERNEL_RELEASE="${KERNEL_V}-${KPN%-sources}-${KERNEL_RV}"
     fi
 
-    KROOT="/tmp/inhibitor/kerncache/${BUILD_NAME}/${KERNEL_RELEASE}/root"
-    KCACHE="/tmp/inhibitor/kerncache/${BUILD_NAME}/${KERNEL_RELEASE}"
+    KROOT="/tmp/inhibitor/kerncache/${KERNEL_RELEASE}/root"
+    KCACHE="/tmp/inhibitor/kerncache/${KERNEL_RELEASE}"
     KERNEL_KCONFIG="/tmp/inhibitor/kconfig"
     mkdir -p ${KROOT}/boot \
         ${KCACHE}/gk-tmp \
         ${KCACHE}/gk-cache &>/dev/null
-    einfo "Installing ${KERNEL_RELEASE} for ${BUILD_NAME}"
+    einfo "Installing ${KERNEL_RELEASE}"
 }
 
 install_tarball() {
@@ -186,9 +186,6 @@ install_tarball() {
 GENKERNEL=""
 while [ $# -gt 0 ]; do
     case $1 in
-        --build_name)
-            shift;BUILD_NAME=${1}
-            ;;
         --kernel_pkg)
             shift;KERNEL_PKG=${1}
             ;;
@@ -202,8 +199,8 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-if [ -z "${BUILD_NAME}" -o -z "${KERNEL_PKG}" ]; then
-    die "Both --build_name and --kernel_pkg must be specified"
+if [ -z "${KERNEL_PKG}" ]; then
+    die "Kernel Package(--kernel_pkg) must be specified"
 fi
 
 init
