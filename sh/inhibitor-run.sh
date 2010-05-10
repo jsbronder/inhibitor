@@ -9,4 +9,4 @@ if ! source ./inhibitor-functions.sh; then
 fi
 
 init
-${1}
+$*

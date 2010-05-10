@@ -146,6 +146,9 @@ class InhibitorStage(InhibitorAction):
             self.ex_make_conf['CFLAGS']     = '-O2 -pipe'
             self.ex_make_conf['CXXFLAGS']   = '-O2 -pipe'
 
+    def _chroot_failure(self, **ignored):
+        util.umount_all(self.istate.mount_points)
+        
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
         ret.append(self.chroot)
@@ -245,18 +248,12 @@ class InhibitorStage(InhibitorAction):
             util.mount(m, self.istate.mount_points)
 
     def chroot(self):
-        try:
-            util.cmd('chroot %s /tmp/inhibitor/sh/inhibitor-run.sh run_%s' 
-                % (self.builddir, self.stage_name))
-        except (KeyboardInterrupt, SystemExit):
-            util.info("Caught SIGTERM or SIGINT:  Waiting for children to die")
-            # XXX:  Hacky.
-            time.sleep(5)
-            util.umount_all(self.istate.mount_points)
-            raise util.InhibitorError("Caught KeyboardInterrupt or SystemExit")
-        except Exception, e:
-            util.umount_all(self.istate.mount_points)
-            raise util.InhibitorError(str(e))
+        util.chroot(
+            path = self.builddir,
+            function = util.cmd,
+            fargs = {'cmdline':  '/tmp/inhibitor/sh/inhibitor-run.sh run_%s' % (self.stage_name,)},
+            failuref = self._chroot_failure,
+        )
 
     def clean_sources(self):
         for src in self.sources:
@@ -337,23 +334,26 @@ class InhibitorStage4(InhibitorStage):
         if self.kernel.has('packages'):
             args.extend(['--packages', self.kernel.packages])
 
-        try:
-            util.cmd('chroot %s /tmp/inhibitor/sh/kernel.sh %s'
-                % (self.builddir, ' '.join(args)) )
-        except (KeyboardInterrupt, SystemExit):
-            util.info("Caught SIGTERM or SIGINT:  Waiting for children to die")
-            # XXX:  Hacky.
-            time.sleep(5)
-            util.umount_all(self.istate.mount_points)
-            raise util.InhibitorError("Caught KeyboardInterrupt or SystemExit")
-        except Exception, e:
-            util.umount_all(self.istate.mount_points)
-            raise util.InhibitorError(str(e))
 
-    def run_scripts(self):        
+        util.chroot(
+            path = self.builddir,
+            function = util.cmd,
+            fargs = {'cmdline': '/tmp/inhibitor/sh/kernel.sh %s' % (' '.join(args),)},
+            failuref = self._chroot_failure,
+        )
+
+    def run_scripts(self):
+        env = {
+            'INHIBITOR_SCRIPT_ROOT':'/tmp/inhibitor/sh'
+        }
         for script in self.scripts:
             script.install()
-            script.run( chroot=self.builddir )
+            util.chroot(
+                path = self.builddir,
+                function = util.cmd,
+                fargs = {'cmdline': script.cmdline(), 'env':env},
+                failuref = self._chroot_failure,
+            )
 
 
 class InhibitorMinimalStage(InhibitorStage4):

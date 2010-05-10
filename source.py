@@ -385,26 +385,12 @@ class InhibitorScript(InhibitorSource):
         for req in self.reqs:
             req.install()
 
-
-    def run(self, chroot):
-        cmd = 'chroot %s /tmp/inhibitor/sh/%s' % (chroot, self.name)
+    def cmdline(self):
+        cmd = '/tmp/inhibitor/sh/%s' % (self.name,)
         if self.args:
             for arg in self.args:
                 cmd += " '%s'" % (arg,)
-        env = {
-            'INHIBITOR_SCRIPT_ROOT':'/tmp/inhibitor/sh'
-        }
-        try:
-            util.cmd(cmd, env=env)
-        except (KeyboardInterrupt, SystemExit):
-            util.info("Caught SIGTERM or SIGINT:  Waiting for children to die")
-            # XXX:  Hacky.
-            time.sleep(5)
-            util.umount_all(self.istate.mount_points)
-            raise util.InhibitorError("Caught KeyboardInterrupt or SystemExit")
-        except Exception, e:
-            util.umount_all(self.istate.mount_points)
-            raise util.InhibitorError(str(e))
+        return cmd
 
 
 

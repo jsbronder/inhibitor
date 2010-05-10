@@ -139,6 +139,7 @@ def _kill_pids(pids, ignore_exceptions=True):
                 os.waitpid(p, 0)
         except OSError, e:
             if ignore_exceptions:
+                warn('Child process %d failed to die' % (p,))
                 pass
             if not e.errno in [10,3]:
                 raise e
@@ -250,6 +251,41 @@ def cmd_out(cmdline, env={}, raise_exception=True, chdir=None):
     except:
         raise
 
+def chroot(path, function, failuref=None, fargs={}, failure_args={}):
+    orig_root = os.open('/', os.O_RDONLY)
+    orig_dir = os.path.realpath(os.curdir)
+    old_env ={}
+    old_env.update(os.environ)
+    try:
+        os.chroot(path)
+    except (IOError, OSError):
+        os.close(orig_root)
+        raise
+
+    try:
+        os.chdir('/')
+    except (IOError, OSError):
+        os.close(orig_root)
+        os.chroot('/')
+        os.chdir(orig_dir)
+
+    try:
+        function(**fargs)
+    except (KeyboardInterrupt, SystemExit, Exception), e:
+        os.fchdir(orig_root)
+        os.chroot('./')
+        os.close(orig_root)
+        os.chdir(orig_dir)
+        if failuref != None:
+            failuref(**failure_args)
+        err(str(e))
+        raise
+
+    os.fchdir(orig_root)
+    os.chroot('./')
+    os.close(orig_root)
+    os.chdir(orig_dir)
+ 
 def make_conf_dict(path):
     if os.path.exists(path):
         return portage_util.getconfig(path, allow_sourcing=True)
