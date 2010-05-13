@@ -151,40 +151,13 @@ class _GenericSource(object):
 
     def install(self, root, dest):
         full_dest = root.pjoin(dest)
-
-        # It's a file, always copy from source.
-        if not self.src_is_dir:
-            util.dbg("Copying %s to %s" % (self.src, full_dest))
-            if not os.path.isdir( os.path.dirname(full_dest) ):
-                os.makedirs(os.path.dirname(full_dest))
-            shutil.copy(self.src, full_dest)
+        if self.keep:
+            util.path_sync(self.src, full_dest, ignore=('.svn', '.git', '*.swp'))
         else:
-            # If we're keeping this, there was no reason to create a cache,
-            # so we again copy directy from the source
-            if self.keep:
-                util.dbg("Copying %s to %s" % (self.src.dname(), full_dest.dname()))
-                if not os.path.isdir(full_dest):
-                    os.mkdir(full_dest)
-                paths = os.listdir(self.src.dname())
-                ignore = self.ignore(self.src.dname(), paths)
-                for p in paths:
-                    if p in ignore:
-                        continue
-                    if os.path.isdir(self.src.pjoin(p)):
-                        shutil.copytree(
-                            self.src.pjoin(p),
-                            full_dest.pjoin(p),
-                            symlinks=True,
-                            ignore=self.ignore)
-                    else:
-                        shutil.copyfile(self.src.pjoin(p), full_dest.pjoin(p))
-            # This is a directory that we do not plan on keeping, so we
-            # bindmount from the cache.
-            else:
-                util.dbg("Bind mounting %s at %s" % (self.cachedir, full_dest))
-                self.mount = util.Mount(self.cachedir, dest, root)
-                util.mount(self.mount, self.istate.mount_points)
-
+            util.dbg("Bind mounting %s at %s" % (self.cachedir, full_dest))
+            self.mount = util.Mount(self.cachedir, dest, root)
+            util.mount(self.mount, self.istate.mount_points)
+        return
 
 class FileSource(_GenericSource):
     def __init__(self, inhibitor_state, name, src, keep, **keywds):
