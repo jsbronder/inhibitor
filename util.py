@@ -277,7 +277,7 @@ def chroot(path, function, failuref=None, fargs={}, failure_args={}):
         os.chdir(orig_dir)
 
     try:
-        function(**fargs)
+        ret = function(**fargs)
     except (KeyboardInterrupt, SystemExit, Exception), e:
         os.fchdir(orig_root)
         os.chroot('./')
@@ -292,6 +292,7 @@ def chroot(path, function, failuref=None, fargs={}, failure_args={}):
     os.chroot('./')
     os.close(orig_root)
     os.chdir(orig_dir)
+    return ret
  
 def make_conf_dict(path):
     if os.path.exists(path):
