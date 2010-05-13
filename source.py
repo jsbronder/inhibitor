@@ -324,7 +324,7 @@ class InhibitorScript(InhibitorSource):
             src,
             dest = util.Path('/tmp/inhibitor/sh').pjoin(name),
             name = name,
-            keep = False)
+            keep = True)
         if args != None:
             if type(args) == types.StringType:
                 self.args = args.split(" ")
@@ -340,7 +340,7 @@ class InhibitorScript(InhibitorSource):
             needs = [needs]
         for need in needs:
             need.dest = util.Path('/tmp/inhibitor/sh').pjoin(os.path.basename(need.src))
-            need.keep = False
+            need.keep = True
             self.reqs.append(need)
 
     def post_conf(self, inhibitor_state):
