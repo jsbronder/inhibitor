@@ -101,7 +101,26 @@ class InhibitorStage(InhibitorAction):
         self.builddir       = None
         self.seed           = None
         self.sh_scripts     = ['inhibitor-run.sh', 'inhibitor-functions.sh']
+        self.portage_cf     = util.Path('/')    # PORTAGE_CONFIGROOT
 
+        self.ex_make_conf   = {
+            'PKGDIR':       '/tmp/inhibitor/pkgs/',
+            'DISTDIR':      '/tmp/inhibitor/dist/',
+        }
+        self.env = {
+            'INHIBITOR_SCRIPT_ROOT':'/tmp/inhibitor/sh'
+        }
+
+    def _chroot_failure(self, **ignored):
+        util.umount_all(self.istate.mount_points)
+        
+    def get_action_sequence(self):
+        ret = self.setup_sequence[:]
+        ret.append(self.chroot)
+        ret.extend(self.cleanup_sequence)
+        return ret
+
+    def parse_config(self):
         if self.conf.has('snapshot'):
             self.conf.snapshot.keep = False
             self.conf.snapshot.dest = util.Path('/usr/portage')
@@ -119,35 +138,25 @@ class InhibitorStage(InhibitorAction):
 
         if self.conf.has('portage_conf'):
             self.conf.portage_conf.keep = True
-            self.conf.portage_conf.dest = util.Path('/etc/portage')
+            self.conf.portage_conf.dest = util.Path('%s/etc/portage' % (self.portage_cf,))
             self.sources.append(self.conf.portage_conf)
 
-        self.ex_make_conf   = {
-            'PKGDIR':       '/tmp/inhibitor/pkgs/',
-            'DISTDIR':      '/tmp/inhibitor/dist/',
-        }
+
         if len(portdir_overlay) > 0:
             self.ex_make_conf['PORTDIR_OVERLAY'] = ' '.join(portdir_overlay)
 
         if self.conf.has('make_conf'):
             self.conf.make_conf.keep = True
-            self.conf.make_conf.dest = util.Path('/etc/make.conf')
+            self.conf.make_conf.dest = util.Path('%s/etc/make.conf' % (self.portage_cf,))
             self.sources.append(self.conf.make_conf)
         else:
             self.ex_make_conf['CFLAGS']     = '-O2 -pipe'
             self.ex_make_conf['CXXFLAGS']   = '-O2 -pipe'
 
-    def _chroot_failure(self, **ignored):
-        util.umount_all(self.istate.mount_points)
-        
-    def get_action_sequence(self):
-        ret = self.setup_sequence[:]
-        ret.append(self.chroot)
-        ret.extend(self.cleanup_sequence)
-        return ret
-               
     def post_conf(self, inhibitor_state):
         super(InhibitorStage, self).post_conf(inhibitor_state)
+        self.parse_config()
+
         self.istate     = inhibitor_state
         self.builddir   = self.istate.paths.build.pjoin(self.build_name)
         self.seed       = self.istate.paths.stages.pjoin(self.conf.seed)
@@ -184,7 +193,7 @@ class InhibitorStage(InhibitorAction):
                 shutil.rmtree(self.seed)
                 raise
 
-        util.info("Syncing %s from %s" % (self.seed.dname(), self.builddir.dname()) )
+        util.info("Syncing %s to %s" % (self.seed.dname(), self.builddir.dname()) )
         util.cmd('rsync -a --delete %s %s' % 
             (self.seed.dname(), self.builddir.dname()) )
 
@@ -195,19 +204,17 @@ class InhibitorStage(InhibitorAction):
             src.install()
 
     def profile_link(self):
-        targ = self.builddir.pjoin('/etc/make.profile')
-        if os.path.exists(targ):
+        targ = self.builddir.pjoin('%s/etc/make.profile' % (self.portage_cf,))
+        if os.path.lexists(targ):
             os.unlink(targ)
-        os.symlink('../usr/portage/profiles/%s' % self.conf.profile,
-            self.builddir.pjoin('/etc/make.profile'))
+        os.symlink('/usr/portage/profiles/%s' % self.conf.profile, targ)
 
-    def write_make_conf(self):  
-        shutil.copyfile(
-            self.builddir.pjoin('/etc/make.conf'),
-            self.builddir.pjoin('/etc/make.conf.orig'))
+    def write_make_conf(self):
+        mc_path = self.builddir.pjoin('%s/etc/make.conf' % (self.portage_cf,))
+        if os.path.exists( mc_path ):
+            shutil.copyfile(mc_path, mc_path + '.orig')
 
-        makeconf = util.make_conf_dict(self.builddir.pjoin('/etc/make.conf'))
-        makeconf.update(self.ex_make_conf)
+        makeconf = util.make_conf_dict(mc_path)
 
         for k in self.ex_make_conf.keys():
             if not k in makeconf.keys():
@@ -217,8 +224,8 @@ class InhibitorStage(InhibitorAction):
                     if not v in makeconf[k]:
                         makeconf[k] += ' ' + v
         
-        util.write_dict_bash(makeconf, self.builddir.pjoin('/etc/make.conf'))
-        util.write_dict_bash(makeconf, self.builddir.pjoin('/etc/make.conf.inhibitor'))
+        util.write_dict_bash(makeconf, mc_path)
+        util.write_dict_bash(makeconf, mc_path + '.orig')
 
 
     def setup_chroot(self):
@@ -253,10 +260,9 @@ class InhibitorStage(InhibitorAction):
     def cleanup(self):
         util.umount_all(self.istate.mount_points)
         shutil.rmtree(self.builddir.pjoin('tmp/inhibitor'))
-        shutil.copyfile(
-            self.builddir.pjoin('/etc/make.conf.orig'),
-            self.builddir.pjoin('/etc/make.conf'))
-
+        mc_path = self.builddir.pjoin("%s/etc/make.conf" % (self.portage_cf,))
+        if os.path.lexists(mc_path):
+            shutil.copyfile(mc_path + '.orig', mc_path)
 
 
 class InhibitorStage4(InhibitorStage):
@@ -334,15 +340,12 @@ class InhibitorStage4(InhibitorStage):
         )
 
     def run_scripts(self):
-        env = {
-            'INHIBITOR_SCRIPT_ROOT':'/tmp/inhibitor/sh'
-        }
         for script in self.scripts:
             script.install()
             util.chroot(
                 path = self.builddir,
                 function = util.cmd,
-                fargs = {'cmdline': script.cmdline(), 'env':env},
+                fargs = {'cmdline': script.cmdline(), 'env':self.env},
                 failuref = self._chroot_failure,
             )
 
