@@ -4,15 +4,6 @@ import time
 import util
 import glob
 
-class Step(util.Container):
-    def __init__(self, function, always=True, **keywds):
-        super(Step, self).__init__(function=function, always=always, **keywds)
-        self.name = function.func_name
-
-    def run(self):
-        self.function()
-
-
 class InhibitorAction(object):
     """
     Basic action.  Handles running through the action_sequence and catching
@@ -66,8 +57,8 @@ class CreateSnapshotAction(InhibitorAction):
 
     def get_action_sequence(self):
         return [
-            Step(self.fetch,    always=False),
-            Step(self.pack,     always=False),
+            util.Step(self.fetch,    always=False),
+            util.Step(self.pack,     always=False),
         ]
 
     def post_conf(self, inhibitor_state):
@@ -91,17 +82,17 @@ class InhibitorStage(InhibitorAction):
         self.istate = None
 
         self.setup_sequence = [
-            Step(self.get_sources,      always=False),
-            Step(self.unpack_seed,      always=False),
-            Step(self.sync_sources,     always=True),
-            Step(self.profile_link,     always=False),
-            Step(self.write_make_conf,  always=False),
-            Step(self.setup_chroot,     always=True),
+            util.Step(self.get_sources,      always=False),
+            util.Step(self.unpack_seed,      always=False),
+            util.Step(self.sync_sources,     always=True),
+            util.Step(self.profile_link,     always=False),
+            util.Step(self.write_make_conf,  always=False),
+            util.Step(self.setup_chroot,     always=True),
         ]
 
         self.cleanup_sequence = [
-            Step(self.clean_sources,    always=True),
-            Step(self.cleanup,          always=True),
+            util.Step(self.clean_sources,    always=True),
+            util.Step(self.cleanup,          always=True),
         ]
         
         self.sources = []
@@ -300,10 +291,10 @@ class InhibitorStage4(InhibitorStage):
 
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
-        ret.append( Step(self.chroot,               always=False) )
+        ret.append( util.Step(self.chroot,               always=False) )
         if self.conf.has('kernel'):
-            ret.append( Step(self.install_kernel,   always=False) )
-        ret.append( Step(self.run_scripts,          always=False) )
+            ret.append( util.Step(self.install_kernel,   always=False) )
+        ret.append( util.Step(self.run_scripts,          always=False) )
         ret.extend(self.cleanup_sequence)
         return ret
 

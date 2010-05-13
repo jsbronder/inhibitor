@@ -63,6 +63,15 @@ class Mount(object):
         return "src: %s -- dest: %s -- root: %s" % (
             self.src, self.dest, self.root)
 
+class Step(Container):
+    def __init__(self, function, always=True, **keywds):
+        super(Step, self).__init__(function=function, always=always, **keywds)
+        self.name = function.func_name
+
+    def run(self):
+        self.function()
+
+
 def info(message):
     print "\001\033[0;32m\002*\001\033[0m\002 %s" % message
 
