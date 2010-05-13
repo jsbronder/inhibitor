@@ -220,20 +220,16 @@ class FuncSource(_GenericSource):
 
         realdest = root.pjoin(dest)
         if not os.path.exists( os.path.dirname(realdest) ):
-            os.makedirs(realdest)
+            os.makedirs( os.path.dirname(realdest) )
 
         if type(self.output) == types.DictType:
             nkeys = len(self.output.keys())
 
         if type(self.output) == types.StringType:
             util.dbg("Writing string output to %s" % (realdest,))
-            if not os.path.exists( os.path.dirname(realdest) ):
-                os.makedirs(realdest)
             self._write_file(realdest, self.output)
         else:
             util.dbg("Writing dictionary output to %s" % (realdest,))
-            if not os.path.exists(realdest):
-                os.makedirs(realdest)
             self._write_dictionary(realdest, self.output)
          
 
