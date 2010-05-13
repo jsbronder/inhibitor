@@ -202,19 +202,17 @@ def _spawn(cmdline, env={}, return_output=False, show_output=True, timeout=0, ex
         fout.close()
     return ret
 
-def _spawn_bash(cmdline, env, chdir=None, return_output=False):
-    args=['/bin/bash', '-c']
+def _spawn_sh(cmdline, env, chdir=None, return_output=False, shell='/bin/bash'):
+    args=[shell, '-c']
     if '|' in cmdline:
         # Make sure we get a real return value.
         cmdline = "set -o pipefail;" + cmdline 
 
     args.append(cmdline)
-    if 'BASH_ENV' in env:
-        env['BASH_ENV'] = '/i/learned/this/trick/from/catalyst.env'
 
-    return _spawn(args, env, exe='/bin/bash', chdir=chdir, return_output=return_output)
+    return _spawn(args, env, exe=shell, chdir=chdir, return_output=return_output)
 
-def cmd(cmdline, env={}, raise_exception=True, chdir=None):
+def cmd(cmdline, env={}, raise_exception=True, chdir=None, shell='/bin/bash'):
     """
     Call a command using bash.  If piping is detected, pipefail will be set.
 
@@ -230,7 +228,7 @@ def cmd(cmdline, env={}, raise_exception=True, chdir=None):
 
     try:
         sys.stdout.flush()
-        ret = _spawn_bash(cmdline, env, chdir=chdir)
+        ret = _spawn_sh(cmdline, env, chdir=chdir, shell=shell)
         if ret != 0:
             if raise_exception:
                 raise InhibitorError("'%s' returned %d" % (cmdline, ret))
@@ -238,7 +236,7 @@ def cmd(cmdline, env={}, raise_exception=True, chdir=None):
         raise
     return ret
 
-def cmd_out(cmdline, env={}, raise_exception=True, chdir=None):
+def cmd_out(cmdline, env={}, raise_exception=True, chdir=None, shell='/bin/bash'):
     """
     Call a command using bash.  If piping is detected, pipefail will be set.
 
@@ -251,7 +249,7 @@ def cmd_out(cmdline, env={}, raise_exception=True, chdir=None):
 
     try:
         sys.stdout.flush()
-        ret, out = _spawn_bash(cmdline, env, return_output=True, chdir=chdir)
+        ret, out = _spawn_sh(cmdline, env, return_output=True, chdir=chdir, shell=shell)
         if ret != 0 and raise_exception:
             raise InhibitorError("'%s' returned %d, %s" % (cmdline, ret, out))
         if out.count('\n') <= 1:
