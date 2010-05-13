@@ -314,4 +314,69 @@ def write_dict_bash(dict, path):
         f.write('%s="%s"\n' % (k,dict[k]))
     f.close()
 
+def path_sync(src, targ, root='/', ignore='', file_copy_callback=None):
+    """
+    TODO:  This is confusing enough it should probably be documented.
+    """
+    ignore_func = shutil.ignore_patterns(ignore)
+
+    if os.path.isdir(src):
+        if not os.path.isdir(targ):
+            os.makedirs(targ)
+        contents = os.listdir(src)
+        ignore_list = ignore_func(src, contents)
+        for f in contents:
+            if f in ignore_list:
+                continue
+            path_sync(
+                os.path.join(src, f),
+                os.path.join(targ, f),
+                ignore=ignore,
+                root=root,
+                file_copy_callback=file_copy_callback
+            )
+    elif os.path.islink(src):
+        link = os.readlink(src)
+        if not os.path.lexists( os.path.dirname(os.path.realpath(targ)) ):
+            os.makedirs( os.path.dirname(os.path.realpath(targ)) )
+        
+        if os.path.lexists(targ):
+            os.unlink(targ)
+        os.symlink(link, targ)
+
+        if link.startswith('/'):
+            # This is tricky.  We want to follow the link and copy the contents
+            # of whatever it points to.  However, as we may be building up a new
+            # root filesystem, links that start with / cannot be trusted, so we
+            # have to backtrack from the src path to what / actually is.
+            append = ''
+            for i in range(0, src.count('/')-root.count('/')):
+                append = os.path.join(append, '..')
+
+            link = link.lstrip('/')
+            src = os.path.normpath( os.path.join( os.path.dirname(src), append, link) )
+            targ = os.path.normpath( os.path.join( os.path.dirname(targ), append, link) )
+            
+            if os.path.exists(src):
+                path_sync( src, targ,
+                    ignore=ignore,
+                    root=root,
+                    file_copy_callback=file_copy_callback
+                )
+        else:
+            if os.path.exists(src):
+                path_sync(
+                    os.path.join(os.path.dirname(src), link),
+                    os.path.join(os.path.dirname(targ), link),
+                    ignore = ignore,
+                    root=root,
+                    file_copy_callback=file_copy_callback
+                 )
+    else:
+        if not os.path.lexists( os.path.dirname(os.path.realpath(targ)) ):
+            os.makedirs( os.path.dirname(os.path.realpath(targ)) )
+        shutil.copy2(src, targ)
+        if file_copy_callback != None:
+            file_copy_callback(src, targ)
+
 
