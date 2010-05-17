@@ -163,6 +163,8 @@ class FileSource(_GenericSource):
     def __init__(self, inhibitor_state, name, src, keep, **keywds):
         real_src = util.Path(src[6:])
         super(FileSource, self).__init__(inhibitor_state, name, real_src, keep)
+        if not os.path.lexists(self.src):
+            raise util.InhibitorError("Path %s does not exist" % self.src)
         if os.path.isdir(self.src):
             self.src_is_dir = True
 
