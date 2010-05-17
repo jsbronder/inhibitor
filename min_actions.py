@@ -217,10 +217,14 @@ class InhibitorMinStage(actions.InhibitorStage):
         util.mount(m, self.istate.mount_points)
 
         for min_path in self.files:
-            full_glob = self.full_minstage + '/' + min_path
-            full_glob = fix_slash.sub('/', full_glob)
+            if '*' in min_path:
+                full_glob = self.full_minstage + '/' + min_path
+                full_glob = fix_slash.sub('/', full_glob)
+                files = glob.glob( full_glob )
+            else:
+                files = [ self.full_minstage.pjoin(min_path) ]
 
-            for path in glob.iglob( full_glob ):
+            for path in files:
                 if not os.path.lexists(path):
                     util.warn('Path %s does not exist' % (min_path,))
                     continue
