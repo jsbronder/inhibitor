@@ -251,7 +251,7 @@ class InhibitorMinStage(actions.InhibitorStage):
             path = self.full_minroot,
             function = util.cmd,
             fargs = {
-                'cmdline': '/bin/busybox --install -s /bin',
+                'cmdline': '/bin/busybox --install -s',
                 'shell': '/bin/ash',
             },
             failuref = self._chroot_failure
