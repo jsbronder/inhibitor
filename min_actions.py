@@ -84,6 +84,8 @@ class InhibitorMinStage(actions.InhibitorStage):
                 self.files.extend(self.conf.files)
             else:
                 raise util.InhibitorError("Files must be either a string or a list")
+
+        # Put at the beginning of the list so the user can still overwrite these.
         self.files.insert(0, '/bin/busybox')
 
     
@@ -102,7 +104,7 @@ class InhibitorMinStage(actions.InhibitorStage):
         return ret
 
     def prep_dirs(self):
-        for d in ('dev', 'bin', 'sbin', 'proc', 'sys', 'etc'):
+        for d in ('dev', 'bin', 'sbin', 'proc', 'sys', 'etc', 'usr/sbin', 'usr/bin'):
             for i in (self.full_minroot, self.full_minstage):
                 t = i.pjoin(d)
                 if not os.path.exists(t):
