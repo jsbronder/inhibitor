@@ -1,9 +1,9 @@
 import os
-import shutil
 import glob
 import types
 import re
 import magic
+import tarfile
 
 import actions
 import util
@@ -17,7 +17,7 @@ class InhibitorMinStage(actions.InhibitorStage):
         - fs_add:     InhibitorSource, installed as last step over minroot.
         - files:      Files (aside from /bin/busybox) to add to minroot.
                       String or list of globable items.  Symlinks are handled.
-        - TODO:  kernel, bbconfig
+        - TODO:  kernel?
     """
     def __init__(self, stage_conf, build_name, stage_name='minimal_stage', **keywds):
         self.package_list   = []
@@ -25,6 +25,8 @@ class InhibitorMinStage(actions.InhibitorStage):
         self.symlinks       = {}
         self.full_minroot   = None
         self.full_minstage  = None
+        self.tarpath        = None
+        self.cpiopath       = None
         self.fs_add         = None
         self.copied_libs    = []
         self.checked_ldd    = []
@@ -54,6 +56,9 @@ class InhibitorMinStage(actions.InhibitorStage):
         super(InhibitorMinStage, self).post_conf(inhibitor_state)
         self.full_minstage  = self.builddir.pjoin(self.minstage)
         self.full_minroot   = self.builddir.pjoin(self.minroot)
+        self.tarpath        = self.istate.paths.stages.pjoin('%s/image.tar.bz2' % (self.build_name,))
+        self.cpiopath       = self.istate.paths.stages.pjoin('%s/initramfs.gz' % (self.build_name,))
+
         if self.fs_add:
             self.fs_add.post_conf(inhibitor_state)
  
@@ -99,8 +104,9 @@ class InhibitorMinStage(actions.InhibitorStage):
         ret.append( util.Step(self.install_busybox,     always=False) )
         if self.conf.has('fs_add'):
             ret.append( util.Step(self.install_fs_add,  always=False) )
-        ret.append( util.Step(self.pack,            always=False) )
+        ret.append( util.Step(self.pack,                always=False) )
         ret.extend( self.cleanup_sequence )
+        ret.append( util.Step(self.final_report,        always=True)  )
         return ret
 
     def prep_dirs(self):
@@ -265,10 +271,22 @@ class InhibitorMinStage(actions.InhibitorStage):
         self.conf.fs_add.install()
 
     def pack(self):
+        if not os.path.lexists(os.path.dirname(self.tarpath)):
+            os.makedirs(os.path.dirname(self.tarpath))
+        archive = tarfile.open(self.tarpath, 'w:bz2')
+        archive.add(self.full_minroot,
+            arcname = '/',
+            recursive = True
+        )
+
+        if not os.path.lexists(os.path.dirname(self.cpiopath)):
+            os.makedirs(os.path.dirname(self.cpiopath))
         curdir = os.path.realpath(os.curdir)
         os.chdir(self.full_minroot)
-        util.cmd('find ./ | cpio -H newc -o | gzip -c -9 > %s/minimage-%s.gz'
-            % (self.builddir, self.build_name))
+        util.cmd('find ./ | cpio -H newc -o | gzip -c -9 > %s' % (self.cpiopath))
         os.chdir(curdir)
 
 
+    def final_report(self):
+        util.info("Created %s" % (self.tarpath,))
+        util.info("Created %s" % (self.cpiopath,))

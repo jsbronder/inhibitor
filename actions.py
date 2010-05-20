@@ -1,8 +1,8 @@
 import os
 import shutil
-import time
 import util
 import glob
+import tarfile
 
 class InhibitorAction(object):
     """
@@ -69,8 +69,8 @@ class CreateSnapshotAction(InhibitorAction):
         self.src.fetch()
 
     def pack(self):
-        tarfile = self.src.pack()
-        util.info('%s is ready.' % tarfile)
+        path = self.src.pack()
+        util.info('%s is ready.' % path)
 
 
 class InhibitorStage(InhibitorAction):
@@ -100,6 +100,7 @@ class InhibitorStage(InhibitorAction):
         self.ex_mounts      = []
         self.builddir       = None
         self.seed           = None
+        self.tarpath        = None
         self.sh_scripts     = ['inhibitor-run.sh', 'inhibitor-functions.sh']
         self.portage_cf     = util.Path('/')    # PORTAGE_CONFIGROOT
 
@@ -118,6 +119,7 @@ class InhibitorStage(InhibitorAction):
         ret = self.setup_sequence[:]
         ret.append(self.chroot)
         ret.extend(self.cleanup_sequence)
+        ret.append(util.Step(self.pack,             always=True))
         return ret
 
     def parse_config(self):
@@ -160,6 +162,7 @@ class InhibitorStage(InhibitorAction):
         self.istate     = inhibitor_state
         self.builddir   = self.istate.paths.build.pjoin(self.build_name)
         self.seed       = self.istate.paths.stages.pjoin(self.conf.seed)
+        self.tarpath    = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
 
         # Update state
         self.istate.paths.chroot = self.builddir
@@ -264,6 +267,14 @@ class InhibitorStage(InhibitorAction):
         if os.path.lexists(mc_path):
             shutil.copyfile(mc_path + '.orig', mc_path)
 
+    def pack(self):
+        archive = tarfile.open(self.tarpath, 'w:bz2')
+        archive.add(self.builddir,
+            arcname = '/',
+            recursive = True
+        )
+        util.info("Created %s" % (self.tarpath,))
+
 
 class InhibitorStage4(InhibitorStage):
     def __init__(self, stage_conf, build_name, **keywds):
@@ -302,6 +313,7 @@ class InhibitorStage4(InhibitorStage):
             ret.append( util.Step(self.install_kernel,   always=False) )
         ret.append( util.Step(self.run_scripts,          always=False) )
         ret.extend(self.cleanup_sequence)
+        ret.append(util.Step(self.pack,                  always=True)  )
         return ret
 
     def post_conf(self, inhibitor_state):
