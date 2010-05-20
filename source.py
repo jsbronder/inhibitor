@@ -152,7 +152,12 @@ class _GenericSource(object):
     def install(self, root, dest):
         full_dest = root.pjoin(dest)
         if self.keep:
-            util.path_sync(self.src, full_dest, ignore=('.svn', '.git', '*.swp'))
+            util.path_sync(
+                self.src,
+                full_dest,
+                root = root,
+                ignore = "*.swp .git .svn"
+            )
         else:
             util.dbg("Bind mounting %s at %s" % (self.cachedir, full_dest))
             self.mount = util.Mount(self.cachedir, dest, root)
