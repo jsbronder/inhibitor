@@ -8,7 +8,7 @@ install_kernel() {
 
     ROOT=${KROOT} \
         USE=symlink \
-        run_emerge -u --oneshot --nodeps ${KERNEL_PKG}
+        run_emerge -u --oneshot --nodeps ${KERNEL_PKG}              || die "Failed to emerge ${KERNEL_PKG}"
     pushd "${KROOT}"/usr/src/linux-${KERNEL_RELEASE} &>/dev/null    || die "Failed to cd to kernel source"
     cp ${KERNEL_KCONFIG} .config                                    || die "Failed to copy kconfig"
     einfo "Building kernel"
