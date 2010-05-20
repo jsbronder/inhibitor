@@ -207,6 +207,8 @@ class FuncSource(_GenericSource):
 
     @staticmethod
     def _write_file(path, value):
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
         # Find the indentation level of the first line so we can strip
         # that from any following lines.  Allows use of multi-line strings
         # in the return dictionary with correct python indentation.
