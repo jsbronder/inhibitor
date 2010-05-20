@@ -4,6 +4,7 @@ import types
 import re
 import magic
 import tarfile
+import shutil
 
 import actions
 import util
@@ -52,6 +53,10 @@ class InhibitorMinStage(actions.InhibitorStage):
         self.ms.load()
         self.ms.setflags(magic.MAGIC_MIME)
 
+        self.sh_scripts.append('kernel.sh')
+        self.kerndir = util.Path('/tmp/inhibitor/kerncache')
+
+
     def post_conf(self, inhibitor_state):
         super(InhibitorMinStage, self).post_conf(inhibitor_state)
         self.full_minstage  = self.builddir.pjoin(self.minstage)
@@ -61,6 +66,8 @@ class InhibitorMinStage(actions.InhibitorStage):
 
         if self.fs_add:
             self.fs_add.post_conf(inhibitor_state)
+        kerndir = self.istate.paths.kernel.pjoin(self.build_name)
+        self.ex_mounts.append(util.Mount(kerndir, self.kerndir, self.builddir))
  
     def parse_config(self):
         super(InhibitorMinStage, self).parse_config()
@@ -93,6 +100,16 @@ class InhibitorMinStage(actions.InhibitorStage):
         # Put at the beginning of the list so the user can still overwrite these.
         self.files.insert(0, '/bin/busybox')
 
+        if self.conf.has('kernel'):
+            if not self.conf.kernel.has('kconfig'):
+                raise util.InhibitorError("No kconfig specified for kernel")
+            else:
+                self.conf.kernel.kconfig.keep = True
+                self.conf.kernel.kconfig.dest = util.Path('/tmp/inhibitor/kconfig')
+                self.sources.append(self.conf.kernel.kconfig)
+            if not self.conf.kernel.has('kernel_pkg'):
+                raise util.InhibitorError('No kernel_pkg specfied for kernel')
+
     
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
@@ -104,6 +121,8 @@ class InhibitorMinStage(actions.InhibitorStage):
         ret.append( util.Step(self.install_busybox,     always=False) )
         if self.conf.has('fs_add'):
             ret.append( util.Step(self.install_fs_add,  always=False) )
+        if self.conf.has('kernel'):
+            ret.append( util.Step(self.build_kernel,    always=False) )
         ret.append( util.Step(self.pack,                always=False) )
         ret.extend( self.cleanup_sequence )
         ret.append( util.Step(self.final_report,        always=True)  )
@@ -271,22 +290,50 @@ class InhibitorMinStage(actions.InhibitorStage):
         self.conf.fs_add.install()
 
     def pack(self):
-        if not os.path.lexists(os.path.dirname(self.tarpath)):
-            os.makedirs(os.path.dirname(self.tarpath))
+        basedir = os.path.dirname(self.tarpath)
+        if not os.path.lexists(basedir):
+            os.makedirs(basedir)
+
         archive = tarfile.open(self.tarpath, 'w:bz2')
         archive.add(self.full_minroot,
             arcname = '/',
             recursive = True
         )
 
-        if not os.path.lexists(os.path.dirname(self.cpiopath)):
-            os.makedirs(os.path.dirname(self.cpiopath))
         curdir = os.path.realpath(os.curdir)
         os.chdir(self.full_minroot)
         util.cmd('find ./ | cpio -H newc -o | gzip -c -9 > %s' % (self.cpiopath))
         os.chdir(curdir)
 
+        if self.conf.has('kernel'):
+            kernel_link = self.builddir.pjoin('/tmp/inhibitor/kernelbuild/boot/kernel')
+            kernel_path = os.path.join( os.path.dirname(kernel_link), os.readlink(kernel_link))
+            
+            shutil.copy2(kernel_path, os.path.join(basedir, os.path.basename(kernel_path)) )
+            os.symlink(os.path.basename(kernel_path), os.path.join(basedir, 'kernel'))
+
+    def build_kernel(self):
+        env = {}
+        env.update(self.env)
+        env['ROOT'] = '/tmp/inhibitor/kernelbuild'
+
+        if not os.path.lexists( env['ROOT'] ):
+            os.makedirs( env['ROOT'] )
+
+        args = ['--build_name', self.build_name,
+            '--kernel_pkg', self.conf.kernel.kernel_pkg]
+        util.chroot(
+            path = self.builddir,
+            function = util.cmd,
+            fargs = {
+                'cmdline': '/tmp/inhibitor/sh/kernel.sh %s' % (' '.join(args),),
+                'env': env
+            },
+            failuref = self._chroot_failure,
+        )
 
     def final_report(self):
         util.info("Created %s" % (self.tarpath,))
         util.info("Created %s" % (self.cpiopath,))
+        if self.conf.has('kernel'):
+            util.info("Kernel copied into %s" % (os.path.dirname(self.tarpath),) )
