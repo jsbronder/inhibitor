@@ -1,8 +1,6 @@
 import os
 
 import util
-from source import InhibitorSource
-from actions import CreateSnapshotAction
 
 __version__ = '0.1'
 
@@ -26,11 +24,11 @@ class InhibitorState(object):
             share       = util.Path(os.path.abspath(os.curdir))
         )
 
-        for k,v in paths.items():
+        for k, v in paths.items():
             if hasattr(self.paths, k):
-                setattr(self.paths, k, Path(v))
+                setattr(self.paths, k, util.Path(v))
             else:
-                warn("Ignoring invalid path setting %s" % (k,))
+                util.warn("Ignoring invalid path setting %s" % (k,))
 
         self.mount_points   = []
         self.children       = []
