@@ -349,7 +349,7 @@ class InhibitorStage4(InhibitorStage):
 
     def run_scripts(self):
         for script in self.scripts:
-            script.install()
+            script.install( root=self.builddir )
             util.chroot(
                 path = self.builddir,
                 function = util.cmd,
