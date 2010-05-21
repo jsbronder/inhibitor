@@ -100,15 +100,19 @@ class _GenericSource(object):
     @param src                  - Source path.
     @param name                 - Unique identifier for this source object.
     """
-    def __init__(self, inhibitor_state, name, src, keep):
+    def __init__(self, inhibitor_state, name, src, keep, ignore=None, **keywds):
         self.istate     = inhibitor_state
         self.name       = name
         self.src        = src
         self.keep       = keep
         self.cachedir   = self.istate.paths.cache.pjoin(self.name)
-        self.ignore     = shutil.ignore_patterns('.svn', '.git', '*.swp')
         self.src_is_dir = False
         self.mount      = None
+       
+        if ignore:
+            self.ignore = ignore
+        else:
+            self.ignore = shutil.ignore_patterns('.svn', '.git', '*.swp')
 
     def clean_cache(self, force=False):
         if self.src_is_dir and force:
@@ -153,10 +157,10 @@ class _GenericSource(object):
         full_dest = root.pjoin(dest)
         if self.keep:
             util.path_sync(
-                self.src,
+                self.cachedir,
                 full_dest,
                 root = root,
-                ignore = "*.swp .git .svn"
+                ignore = self.ignore
             )
         else:
             util.dbg("Bind mounting %s at %s" % (self.cachedir, full_dest))
@@ -167,27 +171,24 @@ class _GenericSource(object):
 class FileSource(_GenericSource):
     def __init__(self, inhibitor_state, name, src, keep, **keywds):
         real_src = util.Path(src[6:])
-        super(FileSource, self).__init__(inhibitor_state, name, real_src, keep)
+        super(FileSource, self).__init__(inhibitor_state, name, real_src, keep, **keywds)
         if not os.path.lexists(self.src):
             raise util.InhibitorError("Path %s does not exist" % self.src)
         if os.path.isdir(self.src):
             self.src_is_dir = True
-
+            
     def fetch(self):
-        if not self.src_is_dir or self.keep:
-            return
-        else:
-            self.clean_cache(force=True)
-            shutil.copytree(
-                self.src,
-                self.cachedir.dname(),
-                symlinks=True,
-                ignore=self.ignore)
+        self.clean_cache(force=True)
+        util.path_sync(
+            self.src,
+            self.cachedir,
+            ignore=self.ignore,
+            root = self.src)
 
 
 class FuncSource(_GenericSource):
     def __init__(self, inhibitor_state, name, src, keep, **keywds):
-        super(FuncSource, self).__init__(inhibitor_state, name, src, keep)
+        super(FuncSource, self).__init__(inhibitor_state, name, src, keep, **keywds)
         self.keywds = keywds
         self.output = None
 
@@ -248,7 +249,7 @@ class GitSource(_GenericSource):
     """
 
     def __init__(self, inhibitor_state, name, src, keep, **keywds):
-        super(GitSource, self).__init__(inhibitor_state, name, src, keep)
+        super(GitSource, self).__init__(inhibitor_state, name, src, keep, **keywds)
         self.src_is_dir     = True
         if 'rev' in keywds:
             self.rev        = keywds['rev']
@@ -327,12 +328,13 @@ class GitSource(_GenericSource):
 
 
 class InhibitorScript(InhibitorSource):
-    def __init__(self, name, src, args = None, needs=[]):
+    def __init__(self, name, src, args = None, needs=[], **keywds):
         super(InhibitorScript, self).__init__(
             src,
             dest = util.Path('/tmp/inhibitor/sh').pjoin(name),
             name = name,
-            keep = True)
+            keep = True,
+            **keywds)
         if args != None:
             if type(args) == types.StringType:
                 self.args = args.split(" ")
