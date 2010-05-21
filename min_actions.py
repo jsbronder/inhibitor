@@ -310,7 +310,10 @@ class InhibitorMinStage(actions.InhibitorStage):
             kernel_path = os.path.join( os.path.dirname(kernel_link), os.readlink(kernel_link))
             
             shutil.copy2(kernel_path, os.path.join(basedir, os.path.basename(kernel_path)) )
-            os.symlink(os.path.basename(kernel_path), os.path.join(basedir, 'kernel'))
+            link_path = os.path.join(basedir, 'kernel')
+            if os.path.lexists(link_path):
+                os.unlink(link_path)
+            os.symlink(os.path.basename(kernel_path), link_path)
 
     def build_kernel(self):
         env = {}
