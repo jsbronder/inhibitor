@@ -318,7 +318,12 @@ def path_sync(src, targ, root='/', ignore='', file_copy_callback=None):
     """
     TODO:  This is confusing enough it should probably be documented.
     """
-    ignore_func = shutil.ignore_patterns(ignore)
+    if type(ignore) == types.FunctionType:
+        ignore_func = ignore
+    elif type(ignore) == types.StringType:
+        ignore_func = shutil.ignore_patterns(ignore.split(' '))
+    else:
+        ignore_func = shutil.ignore_patterns(ignore)
 
     if os.path.isdir(src):
         if not os.path.isdir(targ):
@@ -331,7 +336,7 @@ def path_sync(src, targ, root='/', ignore='', file_copy_callback=None):
             path_sync(
                 os.path.join(src, f),
                 os.path.join(targ, f),
-                ignore=ignore,
+                ignore=ignore_func,
                 root=root,
                 file_copy_callback=file_copy_callback
             )
@@ -359,7 +364,7 @@ def path_sync(src, targ, root='/', ignore='', file_copy_callback=None):
             
             if os.path.exists(src):
                 path_sync( src, targ,
-                    ignore=ignore,
+                    ignore=ignore_func,
                     root=root,
                     file_copy_callback=file_copy_callback
                 )
@@ -368,7 +373,7 @@ def path_sync(src, targ, root='/', ignore='', file_copy_callback=None):
                 path_sync(
                     os.path.join(os.path.dirname(src), link),
                     os.path.join(os.path.dirname(targ), link),
-                    ignore = ignore,
+                    ignore = ignore_func,
                     root=root,
                     file_copy_callback=file_copy_callback
                  )
