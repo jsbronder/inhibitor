@@ -287,7 +287,7 @@ class InhibitorMinStage(actions.InhibitorStage):
 
     def install_fs_add(self):
         self.conf.fs_add.fetch()
-        self.conf.fs_add.install()
+        self.conf.fs_add.install( root=self.builddir )
 
     def pack(self):
         basedir = os.path.dirname(self.tarpath)

@@ -71,20 +71,20 @@ class InhibitorSource(object):
         self.backend.fetch()
         self.fetched = True
 
-    def install(self):
+    def install(self, root):
         self._check()
         if self.dest == None:
             return
 #        if not self.fetched:
 #            self.fetch()
-        self.backend.install(self.istate.paths.chroot, self.dest)
+        self.backend.install(root, self.dest)
         
 
-    def clean(self):
+    def clean(self, root):
         self._check()
         if self.dest == None or self.keep:
             return
-        self.backend.clean(self.istate.paths.chroot, self.dest)
+        self.backend.clean(root, self.dest)
 
     def pack(self):
         self._check()
@@ -142,7 +142,7 @@ class _GenericSource(object):
             for f in include:
                 if f in ('.svn', '.git'):
                     continue
-                full_path = os.path.pjoin(root, f)
+                full_path = os.path.join(root, f)
                 archive.add(full_path,
                     arcname = full_path[striplen:],
                     recursive = False )
@@ -198,7 +198,7 @@ class FuncSource(_GenericSource):
                 % (self.name, str(type(self.output))) )
 
     def _write_dictionary(self, destdir, d):
-        for k,v in d.items():
+        for k, v in d.items():
             if type(v) == types.StringType:
                 self._write_file(destdir.pjoin(k), v)
             else:
@@ -222,7 +222,6 @@ class FuncSource(_GenericSource):
         f.close()
  
     def install(self, root, dest):
-        nkeys = None
         if self.output == None:
             # In case we're resuming a build where the fetch step was skipped.
             self.fetch()
@@ -357,11 +356,11 @@ class InhibitorScript(InhibitorSource):
         for req in self.reqs:
             req.post_conf(inhibitor_state)
     
-    def install(self):
-        super(InhibitorScript, self).install()
-        os.chmod(self.istate.paths.chroot.pjoin(self.dest), 0755)
+    def install(self, root):
+        super(InhibitorScript, self).install(root)
+        os.chmod(root.pjoin(self.dest), 0755)
         for req in self.reqs:
-            req.install()
+            req.install(root)
 
     def cmdline(self):
         cmd = '/tmp/inhibitor/sh/%s' % (self.name,)

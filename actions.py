@@ -163,10 +163,6 @@ class InhibitorStage(InhibitorAction):
         self.builddir   = self.istate.paths.build.pjoin(self.build_name)
         self.seed       = self.istate.paths.stages.pjoin(self.conf.seed)
         self.tarpath    = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
-
-        # Update state
-        self.istate.paths.chroot = self.builddir
-
         pkgdir          = self.istate.paths.pkgs.pjoin(self.build_name)
         distdir         = self.istate.paths.dist
 
@@ -204,7 +200,7 @@ class InhibitorStage(InhibitorAction):
         for src in self.sources:
             if self.resume and src.keep:
                 continue
-            src.install()
+            src.install( root=self.builddir )
 
     def profile_link(self):
         targ = self.builddir.pjoin('%s/etc/make.profile' % (self.portage_cf,))
@@ -258,7 +254,7 @@ class InhibitorStage(InhibitorAction):
 
     def clean_sources(self):
         for src in self.sources:
-            src.clean()
+            src.clean(self.builddir)
 
     def cleanup(self):
         util.umount_all(self.istate.mount_points)
