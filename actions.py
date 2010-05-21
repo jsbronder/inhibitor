@@ -3,6 +3,7 @@ import shutil
 import util
 import glob
 import tarfile
+import types
 
 class InhibitorAction(object):
     """
@@ -50,27 +51,93 @@ class InhibitorAction(object):
         os.rmdir(self.statedir)
 
 
-class CreateSnapshotAction(InhibitorAction):
-    def __init__(self, snapshot_source, **keywds):
-        super(CreateSnapshotAction, self).__init__('snapshot-%s' % (snapshot_source.name,), **keywds)
-        self.src = snapshot_source
+class InhibitorSnapshot(InhibitorAction):
+    def __init__(self, snapshot_source, exclude=None, include=None):
+        super(InhibitorSnapshot, self).__init__(name='snapshot')
+        self.dest       = None
+        self.builddir   = None
+        self.tarname    = None
+        self.dest       = None
+
+        self.src        = snapshot_source
+        self.src.keep   = True
+        self.src.dest   = util.Path('/')
+
+        if exclude:
+            if type(exclude) == types.StringType:
+                self.exclude = exclude.split(' ')
+            elif type(exclude) in (types.ListType, types.TupleType):
+                self.exclude = exclude
+            else:
+                raise util.InhibitorError("Unrecognized exclude pattern.")
+        else:
+            self.exclude = False
+
+        if include:
+            if type(include) == types.StringType:
+                self.include = include.split(' ')
+            elif type(include) in (types.ListType, types.TupleType):
+                self.include = include
+            else:
+                raise util.InhibitorError("Unrecognized include pattern.")
+        else:
+            self.include = False
 
     def get_action_sequence(self):
         return [
             util.Step(self.fetch,    always=False),
+            util.Step(self.sync,     always=False),
             util.Step(self.pack,     always=False),
         ]
 
     def post_conf(self, inhibitor_state):
-        super(CreateSnapshotAction, self).post_conf(inhibitor_state)
+        super(InhibitorSnapshot, self).post_conf(inhibitor_state)
         self.src.post_conf(inhibitor_state)
+
+        self.tarname    = 'snapshot-' + self.src.name
+        self.dest       = inhibitor_state.paths.stages.pjoin(self.tarname+'.tar.bz2')
+        self.builddir   = inhibitor_state.paths.build.pjoin(self.tarname)
 
     def fetch(self):
         self.src.fetch()
 
+    def sync(self):
+        if os.path.exists(self.builddir):
+            shutil.rmtree(self.builddir)
+        elif os.path.islink(self.builddir):
+            os.unlink(self.builddir)
+        os.makedirs(self.builddir)
+
+        exclude_cmd = ''
+        if self.exclude:
+            for i in self.exclude:
+                exclude_cmd += " --exclude='%s'" % i
+
+        if self.include:
+            for pattern in self.include:
+                paths = [self.src.cachedir.pjoin(pattern)]
+                if '*' in pattern:
+                    paths = glob.glob(self.src.cachedir.pjoin(pattern))
+
+                for path in paths:
+                    dest = path.replace(self.src.cachedir, self.builddir)
+                    if not os.path.lexists( os.path.dirname(dest) ):
+                        os.makedirs( os.path.dirname(dest) )
+                    util.cmd('rsync -a %s %s/ %s/' % (
+                        exclude_cmd,
+                        path,
+                        dest
+                    ))
+        else:
+            util.cmd('rsync -a %s %s/ %s/' % (exclude_cmd, self.src.cachedir, self.builddir))
+
     def pack(self):
-        path = self.src.pack()
-        util.info('%s is ready.' % path)
+        archive = tarfile.open(self.dest, 'w:bz2')
+        archive.add(self.builddir,
+            arcname = '/',
+            recursive = True
+        )
+        util.info('%s is ready.' % self.dest)
 
 
 class InhibitorStage(InhibitorAction):
