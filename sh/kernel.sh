@@ -84,7 +84,7 @@ post_kern_merge() {
     
 install_initramfs() {
     local rm_genkernel=true
-    local kname=${KPN%-sources-*}
+    local kname=${KPN%-sources*}
 
     if [ -d /var/db/pkg/sys-kernel/genkernel-[0-9]* ]; then
         rm_genkernel=false
