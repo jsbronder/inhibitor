@@ -108,6 +108,9 @@ class _GenericSource(object):
         self.cachedir   = self.istate.paths.cache.pjoin(self.name)
         self.src_is_dir = False
         self.mount      = None
+
+        # Some types are not cached as there is no reason
+        self.sync_src   = self.cachedir
        
         if ignore:
             self.ignore = ignore
@@ -157,7 +160,7 @@ class _GenericSource(object):
         full_dest = root.pjoin(dest)
         if self.keep:
             util.path_sync(
-                self.cachedir,
+                self.sync_src,
                 full_dest,
                 root = root,
                 ignore = self.ignore
@@ -176,6 +179,7 @@ class FileSource(_GenericSource):
             raise util.InhibitorError("Path %s does not exist" % self.src)
         if os.path.isdir(self.src):
             self.src_is_dir = True
+        self.sync_src = self.src
             
     def fetch(self):
         self.clean_cache(force=True)
