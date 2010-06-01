@@ -299,6 +299,7 @@ class InhibitorMinStage(actions.InhibitorStage):
             arcname = '/',
             recursive = True
         )
+        archive.close()
 
         curdir = os.path.realpath(os.curdir)
         os.chdir(self.full_minroot)

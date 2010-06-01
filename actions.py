@@ -137,6 +137,7 @@ class InhibitorSnapshot(InhibitorAction):
             arcname = '/',
             recursive = True
         )
+        archive.close()
         util.info('%s is ready.' % self.dest)
 
 
@@ -336,6 +337,7 @@ class InhibitorStage(InhibitorAction):
             arcname = '/',
             recursive = True
         )
+        archive.close()
         util.info("Created %s" % (self.tarpath,))
 
 
