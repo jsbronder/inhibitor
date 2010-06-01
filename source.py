@@ -299,7 +299,8 @@ class GitSource(_GenericSource):
             self.clean_cache(force=False)
 
         if os.path.isdir(self.gitdir):
-            util.cmd('git reset --hard', env=self.env, chdir=self.cachedir)
+            util.cmd('git reset --hard HEAD', env=self.env, chdir=self.cachedir)
+            util.cmd('git clean -f', env=self.env, chdir=self.cachedir)
             util.cmd('git checkout master', env=self.env, chdir=self.cachedir)
             util.cmd('git pull', env=self.env)
         else:
