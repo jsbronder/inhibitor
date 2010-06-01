@@ -43,16 +43,6 @@ post_kern_merge() {
         POST_KERN_PKGS=""
     fi
 
-    for i in ${GENKERNEL}; do
-        case "${i}" in
-            --splash=*)
-                POST_KERN_PKGS="${POST_KERN_PKGS} media-gfx/splashutils"
-                ;;
-            *)
-                ;;
-        esac
-    done
-
     if [ -z "${POST_KERN_PKGS}" ]; then
         return
     fi
@@ -108,6 +98,7 @@ install_initramfs() {
        || die "Failed to sanitize genkernel intramfs filename"
  
     ln -snf initramfs-${KERNEL_RELEASE} ${KROOT}/boot/initramfs
+    ${rm_genkernel} && emerge -C sys-kernel/genkernel
 }
 
 create_tarball() {
