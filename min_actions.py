@@ -8,6 +8,7 @@ import shutil
 
 import actions
 import util
+import source
 
 class InhibitorMinStage(actions.InhibitorStage):
     """
@@ -29,8 +30,11 @@ class InhibitorMinStage(actions.InhibitorStage):
         self.tarpath        = None
         self.cpiopath       = None
         self.fs_add         = None
+        self.baselayout     = None
         self.copied_libs    = []
         self.checked_ldd    = []
+        self.modules        = []
+        self.moduledir      = None
 
         super(InhibitorMinStage, self).__init__(stage_conf, build_name, stage_name='min', **keywds)
 
@@ -57,10 +61,12 @@ class InhibitorMinStage(actions.InhibitorStage):
         self.kerndir = util.Path('/tmp/inhibitor/kerncache')
 
 
+
     def post_conf(self, inhibitor_state):
         super(InhibitorMinStage, self).post_conf(inhibitor_state)
         self.full_minstage  = self.builddir.pjoin(self.minstage)
         self.full_minroot   = self.builddir.pjoin(self.minroot)
+        self.moduledir      = inhibitor_state.paths.share.pjoin('sh/early-userspace/modules')
         self.tarpath        = self.istate.paths.stages.pjoin('%s/image.tar.bz2' % (self.build_name,))
         self.cpiopath       = self.istate.paths.stages.pjoin('%s/initramfs.gz' % (self.build_name,))
 
@@ -68,6 +74,14 @@ class InhibitorMinStage(actions.InhibitorStage):
             self.fs_add.post_conf(inhibitor_state)
         kerndir = self.istate.paths.kernel.pjoin(self.build_name)
         self.ex_mounts.append(util.Mount(kerndir, self.kerndir, self.builddir))
+
+        self.baselayout     = source.InhibitorSource(
+            'file://%s/sh/early-userspace/root' % inhibitor_state.paths.share,
+            keep = True,
+            dest = self.minroot
+        )
+        self.baselayout.post_conf(inhibitor_state)
+
  
     def parse_config(self):
         super(InhibitorMinStage, self).parse_config()
@@ -84,6 +98,9 @@ class InhibitorMinStage(actions.InhibitorStage):
             self.fs_add = self.conf.fs_add
             self.fs_add.dest = self.minroot
             self.fs_add.keep = True
+
+        if self.conf.has('modules'):
+            self.modules = self.conf.modules
 
         self.files = []
         if self.conf.has('files'):
@@ -113,23 +130,26 @@ class InhibitorMinStage(actions.InhibitorStage):
     
     def get_action_sequence(self):
         ret = self.setup_sequence[:]
-        ret.append( util.Step(self.prep_dirs,           always=False) )
+        ret.append( util.Step(self.prep_minroot,        always=False) )
         ret.append( util.Step(self.merge_busybox,       always=False) )
         if self.conf.has('package_list'):
             ret.append( util.Step(self.merge_packages,  always=False) )
         ret.append( util.Step(self.copy_files,          always=False) )
         ret.append( util.Step(self.install_busybox,     always=False) )
+        ret.append( util.Step(self.install_modules,     always=False) )
         if self.conf.has('fs_add'):
             ret.append( util.Step(self.install_fs_add,  always=False) )
         if self.conf.has('kernel'):
             ret.append( util.Step(self.build_kernel,    always=False) )
+        ret.append( util.Step(self.update_init,         always=False) )
         ret.append( util.Step(self.pack,                always=False) )
         ret.extend( self.cleanup_sequence )
         ret.append( util.Step(self.final_report,        always=True)  )
         return ret
 
-    def prep_dirs(self):
-        for d in ('dev', 'bin', 'sbin', 'proc', 'sys', 'etc', 'usr/sbin', 'usr/bin'):
+    def prep_minroot(self):
+        for d in ('dev', 'bin', 'sbin', 'proc', 'sys', 'etc', '/tmp',
+                    'usr/sbin', 'usr/bin', 'etc/rc.d', 'etc/conf.d'):
             for i in (self.full_minroot, self.full_minstage):
                 t = i.pjoin(d)
                 if not os.path.exists(t):
@@ -141,6 +161,9 @@ class InhibitorMinStage(actions.InhibitorStage):
             os.symlink(os.readlink(libpath), self.full_minstage.pjoin('lib'))
             os.makedirs( os.path.realpath(libpath).replace(self.builddir, self.full_minroot))
             os.makedirs( os.path.realpath(libpath).replace(self.builddir, self.full_minstage))
+
+        self.baselayout.fetch()
+        self.baselayout.install( root=self.builddir )
             
 
     def merge_busybox(self):
@@ -285,9 +308,32 @@ class InhibitorMinStage(actions.InhibitorStage):
         )
         util.umount(m, self.istate.mount_points)
 
+    def install_modules(self):
+        for m in self.modules:
+            init = self.moduledir.pjoin('%s.init' % m)
+            conf = self.moduledir.pjoin('%s.conf' % m)
+            if os.path.exists(init):
+                shutil.copy2(init, self.full_minroot.pjoin('etc/init.d/%s' % m))
+            if os.path.exists(conf):
+                shutil.copy2(conf, self.full_minroot.pjoin('etc/conf.d/%s' % m))
+
     def install_fs_add(self):
         self.conf.fs_add.fetch()
         self.conf.fs_add.install( root=self.builddir )
+
+    def update_init(self):
+        for initd in glob.iglob('%s/*' % self.full_minroot.pjoin('etc/init.d')):
+            int_path = initd.replace(self.full_minroot, '')
+            util.dbg('Adding %s to init' % int_path)
+            util.chroot(
+                path = self.full_minroot,
+                function = util.cmd,
+                fargs = {
+                    'cmdline':  '%s enable' % int_path,
+                    'shell':    '/bin/ash'
+                },
+                failuref = self._chroot_failure,
+            )
 
     def pack(self):
         basedir = os.path.dirname(self.tarpath)
