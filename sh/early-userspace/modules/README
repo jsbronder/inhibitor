@@ -1,0 +1,13 @@
+What's brought up by the runlevels.
+
+00-09:      /sys, /dev/, /proc up and populated.
+10-19:      command line parsed
+            hostname set
+20-29:      loggers started.
+30-39:      Find real filesystems and mount.
+            mdadm
+            lvm
+
+Shutdown:
+
+70:         filesystems unmounted and drives synced.

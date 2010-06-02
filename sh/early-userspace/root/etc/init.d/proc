@@ -1,0 +1,9 @@
+#!/bin/sh /etc/rc-functions.sh
+
+START=00
+
+start () {
+    [ -d /proc ] || mkdir /proc
+    mount -n -t proc proc /proc || die "Failed to mount /proc"
+}
+    

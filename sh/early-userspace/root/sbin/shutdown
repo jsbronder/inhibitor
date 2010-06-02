@@ -1,0 +1,5 @@
+#!/bin/sh
+
+/sbin/rc K
+[ "${1}" == "-r" ] && exec /sbin/reboot
+exec /sbin/poweroff

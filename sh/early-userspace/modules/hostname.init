@@ -1,0 +1,17 @@
+#!/bin/sh /etc/rc-functions.sh
+START=11
+
+start () {
+    local h="${HOST}"
+    local real_hostname
+    source /etc/kcmdline.conf
+
+    # 1. Argument from cmdline
+    # 2. Argument front configuration file.
+    # 3. Inhibitor
+    real_hostname=${HOST}
+
+    [ -z "${real_hostname}" ] && real_hostname=${h}
+    echo "${real_hostname:-inhibitor}" > /proc/sys/kernel/hostname
+}
+

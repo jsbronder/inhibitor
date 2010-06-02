@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc-functions.sh
+START=20
+
+RUN_SYSLOGD=${RUN_SYSLOGD:-1}
+RUN_KLOGD=${RUN_KLOGD:-1}
+
+SYSLOG_ARGS="${SYSLOG_ARGS:--C16 -S}"
+KLOG_ARGS="${KLOG_ARGS:--c2}"
+
+start () {
+    if [ -x /sbin/syslogd -a ${RUN_SYSLOGD} -ne 0 ]; then
+        /sbin/syslogd ${SYSLOG_ARGS}
+    fi
+
+    if [ -x /sbin/klogd -a ${RUN_KLOGD} -ne 0 ]; then
+        /sbin/klogd ${KLOG_ARGS}
+    fi
+}
+
+stop () {
+    killall syslogd 1>/dev/null 2>/dev/null 
+    killall klogd 1>/dev/null 2>/dev/null 
+}
+    
+    

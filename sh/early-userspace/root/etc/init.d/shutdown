@@ -1,0 +1,7 @@
+#!/bin/sh /etc/rc-functions.sh
+STOP=70
+
+stop() {
+    sync 
+    umount -a -r
+}

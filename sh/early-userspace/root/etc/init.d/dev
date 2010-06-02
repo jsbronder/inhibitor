@@ -1,0 +1,24 @@
+#!/bin/sh /etc/rc-functions.sh
+START=01
+
+start () {
+    # Pre-seed /dev
+    [ -c /dev/console   ] || mknod -m 600 /dev/console  c 5 1
+    [ -c /dev/null      ] || mknod -m 666 /dev/null     c 1 3
+    [ -c /dev/tty1      ] || mknod -m 620 /dev/tty1     c 4 1
+    [ -c /dev/tty       ] || mknod -m 666 /dev/tty      c 5 0
+    [ -c /dev/kmsg      ] || mknod -m 660 /dev/kmsg     c 1 11
+
+    ln -snf /proc/self/fd /dev/fd
+
+    [ -d /dev/pts ] || mkdir /dev/pts
+    [ -d /dev/shm ] || mkdir /dev/shm
+    if grep '[[:space:]]devpts' /proc/filesystems >/dev/null 2>/dev/null; then
+        mount -n -t devpts devpts /dev/pts
+    fi
+
+    if [ -x /sbin/mdev ]; then
+        echo '/sbin/mdev' > /proc/sys/kernel/hotplug
+        mdev -s || die "Failed to start mdev"
+    fi
+}

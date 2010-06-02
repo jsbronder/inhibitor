@@ -1,0 +1,12 @@
+#!/bin/sh /etc/rc-functions.sh
+START=02
+
+start () {
+    if awk '/^rootfs/{print $4}' /proc/mounts  | grep ',\?ro,\?' >/dev/null; then
+        mount -n -o remount,rw / || die "Failed to remount / rw"
+    fi
+
+    # Update /etc/mtab and remove backups
+    grep -v "^[ ^ ]* / tmpfs " /proc/mounts > /etc/mtab
+    rm -f /etc/mtab?* 
+}

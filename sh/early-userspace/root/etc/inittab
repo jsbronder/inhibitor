@@ -1,0 +1,4 @@
+::wait:/sbin/rc S
+::ctrlaltdel:/sbin/shutdown -r
+tty1::respawn:/bin/login -f root
+

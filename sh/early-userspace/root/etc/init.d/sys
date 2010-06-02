@@ -1,0 +1,8 @@
+#!/bin/sh /etc/rc-functions.sh
+START=00
+
+start () {
+    [ -d /sys ] || mkdir /sys
+    mount -n -t sysfs -o mode=noexec,nosuid,nodev sysfs /sys || die "Failed to mount /sys"
+}
+

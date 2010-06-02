@@ -1,0 +1,51 @@
+#!/bin/sh /etc/rc-functions.sh
+START=21
+
+start () {
+    local cmdline="$(sed 's|.*inhibitor=\([^ ]*\).*|\1|' /proc/cmdline | tr ',' ' ')"
+    local cmd
+    local extras=""
+
+    for cmd in ${cmdline}; do
+        # r,u,rc and d are for compat with standalone inhibitor upgrade.
+        case "${cmd}" in
+            rd:*|rootdev:*)
+                ROOTDEV=${cmd#*:};;
+            r:*|reboot:*)
+                DO_REBOOT=${cmd#*:};;
+            u:*|update:*)
+                DO_UPDATE=${cmd#*:};;
+            d:*|update_src:*)
+                UPDATE_SRC=${cmd#*:};;
+            install:*)
+                DO_INSTALL=${cmd#*:};;
+            install_src:*)
+                INSTALL_SRC=${cmd#*:};;
+            hostname:*)
+                HOST=${cmd#*:};;
+            arch:*)
+                INSTALLER_ARCH=${cmd#*:};;
+            hw_rev:*)
+                INSTALLER_HW_REV=${cmd#*:};;
+            *)
+                extras="${extras} $(echo ${cmd%%:*} | tr [a-z] [A-Z])=\"${cmd#*:}\"";;
+        esac
+    done
+
+    cat <<-EOF > /etc/kcmdline.conf
+ROOTDEV="${ROOTDEV}"
+DO_REBOOT="${DO_REBOOT}"
+DO_UPDATE="${DO_UPDATE}"
+UPDATE_SRC="${UPDATE_SRC}"
+DO_INSTALL="${DO_INSTALL}"
+INSTALL_SRC="${INSTALL_SRC}"
+HOST="${HOST}"
+NSTALLER_ARCH="${INSTALLER_ARCH}"
+NSTALLER_HW_REV="${INSTALLER_HW_REV}"
+EOF
+
+    for cmd in ${extras}; do
+        echo "${cmd}" >> /etc/kcmdline.conf
+    done
+}
+

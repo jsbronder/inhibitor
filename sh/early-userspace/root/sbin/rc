@@ -1,0 +1,13 @@
+#!/bin/sh
+
+run_scripts () {
+    for s in /etc/rc.d/${1}*; do
+        [ -x "${s}" ] && ${s} ${2}
+    done
+}
+
+if [ "${1}" == "S" ]; then
+    run_scripts S start
+elif [ "${1}" == "K" ]; then
+    run_scripts K stop
+fi

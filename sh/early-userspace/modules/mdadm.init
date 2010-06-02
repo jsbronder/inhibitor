@@ -1,0 +1,33 @@
+#!/bin/sh /etc/rc-functions.sh
+
+START=30
+
+need_run () {
+    source /etc/kcmdline.conf
+    
+    [ -n "${ROOTDEV##/dev/md*}" ] \
+        || [ ${MDADM} -ne 0 ] \
+        || [ -s /etc/mdadm.conf ]
+}
+
+start () {
+    local md_dev
+    need_run || return 0
+
+    if [ ! -s /etc/mdadm.conf -o -z "$(grep -v '^#' /etc/mdadm.conf 2>/dev/null)" ]; then
+        /sbin/mdadm --examine --scan > /etc/mdadm.conf
+    fi
+
+    [ -s /etc/mdadm.conf ] || return 0
+
+    /sbin/mdadm --assemble --scan
+
+    # If arrays have strange partitions, make sure they're picked up.
+    for md_dev in /sys/block/md*; do
+        /sbin/mdadm --query /dev/${md_dev##*/} 1>/dev/null 2>/dev/null
+    done
+}
+
+stop () {
+    /sbin/mdadm -Ss
+}
