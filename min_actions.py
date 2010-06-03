@@ -82,6 +82,22 @@ class InhibitorMinStage(actions.InhibitorStage):
         )
         self.baselayout.post_conf(inhibitor_state)
 
+        for m in self.modules:
+            need_file = self.moduledir.pjoin('%s.files' % m)
+            pkg_file = self.moduledir.pjoin('%s.pkgs' % m)
+            if os.path.lexists(need_file):
+                f = open(need_file)
+                for l in f.readlines():
+                    self.files.append(l.strip())
+                    util.dbg('Adding path %s for %s' % (l.strip(), m))
+                f.close()
+            if os.path.lexists(pkg_file):
+                f = open(pkg_file)
+                for l in f.readlines():
+                    self.package_list.append(l.strip())
+                    util.dbg('Adding package %s for %s' % (l.strip(), m))
+                f.close()
+ 
  
     def parse_config(self):
         super(InhibitorMinStage, self).parse_config()
@@ -99,9 +115,6 @@ class InhibitorMinStage(actions.InhibitorStage):
             self.fs_add.dest = self.minroot
             self.fs_add.keep = True
 
-        if self.conf.has('modules'):
-            self.modules = self.conf.modules
-
         self.files = []
         if self.conf.has('files'):
             if type(self.conf.files) == types.StringType:
@@ -113,6 +126,9 @@ class InhibitorMinStage(actions.InhibitorStage):
                 self.files.extend(self.conf.files)
             else:
                 raise util.InhibitorError("Files must be either a string or a list")
+
+        if self.conf.has('modules'):
+            self.modules = self.conf.modules
 
         # Put at the beginning of the list so the user can still overwrite these.
         self.files.insert(0, '/bin/busybox')
