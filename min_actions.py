@@ -212,7 +212,7 @@ class InhibitorMinStage(actions.InhibitorStage):
             function = util.cmd,
             fargs = {
                 'cmdline':
-                    '%s run_emerge --newuse --onlydeps %s' % (ir, ' '.join(self.package_list)),
+                    '%s run_emerge --newuse %s' % (ir, ' '.join(self.package_list)),
                 'env':self.env
             },
             failuref = self._chroot_failure
@@ -223,7 +223,7 @@ class InhibitorMinStage(actions.InhibitorStage):
             function = util.cmd,
             fargs = {
                 'cmdline':
-                    '%s run_emerge --newuse %s' % (ir, ' '.join(self.package_list)),
+                    '%s run_emerge --newuse --nodeps %s' % (ir, ' '.join(self.package_list)),
                 'env':self.root_env,
             },
             failuref = self._chroot_failure
