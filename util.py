@@ -314,7 +314,7 @@ def write_dict_bash(dict, path):
         f.write('%s="%s"\n' % (k,dict[k]))
     f.close()
 
-def path_sync(src, targ, root='/', ignore='', file_copy_callback=None):
+def path_sync(src, targ, root='/', ignore=lambda x,y: [], file_copy_callback=None):
     """
     TODO:  This is confusing enough it should probably be documented.
     """
