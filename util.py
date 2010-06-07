@@ -384,4 +384,14 @@ def path_sync(src, targ, root='/', ignore=lambda x,y: [], file_copy_callback=Non
         if file_copy_callback != None:
             file_copy_callback(src, targ)
 
-
+def strlist_to_list( strlist ):
+    """
+    Wrap testing if an object is a list or a string, return it
+    as a list of strings.
+    """
+    if type(strlist) == types.StringType:
+        ret = strlist.split()
+    elif type(strlist) == types.ListType:
+        ret = strlist
+    else:
+        raise InhibitorError("Cannot convert object to list.  %s" % (strlist,))
