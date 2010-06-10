@@ -72,15 +72,17 @@ class InhibitorMinStage(actions.InhibitorStage):
 
         if self.fs_add:
             self.fs_add.post_conf(inhibitor_state)
+            self.fs_add.init()
         kerndir = self.istate.paths.kernel.pjoin(self.build_name)
         self.ex_mounts.append(util.Mount(kerndir, self.kerndir, self.builddir))
 
-        self.baselayout     = source.InhibitorSource(
-            'file://%s/sh/early-userspace/root' % inhibitor_state.paths.share,
+        self.baselayout     = source.create_source(
+            src = 'file://%s/sh/early-userspace/root' % inhibitor_state.paths.share,
             keep = True,
             dest = self.minroot
         )
         self.baselayout.post_conf(inhibitor_state)
+        self.baselayout.init()
 
         for m in self.modules:
             need_file = self.moduledir.pjoin('%s.files' % m)
@@ -178,7 +180,6 @@ class InhibitorMinStage(actions.InhibitorStage):
             os.makedirs( os.path.realpath(libpath).replace(self.builddir, self.full_minroot))
             os.makedirs( os.path.realpath(libpath).replace(self.builddir, self.full_minstage))
 
-        self.baselayout.fetch()
         self.baselayout.install( root=self.builddir )
             
 
@@ -257,9 +258,10 @@ class InhibitorMinStage(actions.InhibitorStage):
             if not lib in self.copied_libs:
                 self.copied_libs.append(lib)
                 libs.append( self.full_minstage.pjoin(lib) )
+                util.dbg("Adding required library %s" % lib)
         return libs
 
-    def path_sync_callback(self, src, targ):
+    def path_sync_callback(self, src, _):
         try:
             mime_type = self.ms.file(src).split(';')[0]
         except AttributeError:
@@ -334,7 +336,6 @@ class InhibitorMinStage(actions.InhibitorStage):
                 shutil.copy2(conf, self.full_minroot.pjoin('etc/conf.d/%s' % m))
 
     def install_fs_add(self):
-        self.conf.fs_add.fetch()
         self.conf.fs_add.install( root=self.builddir )
 
     def update_init(self):
@@ -397,6 +398,12 @@ class InhibitorMinStage(actions.InhibitorStage):
             },
             failuref = self._chroot_failure,
         )
+
+    def clean_sources(self):
+        super(InhibitorMinStage, self).clean_sources()
+        for src in (self.fs_add, self.baselayout):
+            src.remove()
+            src.finish()
 
     def final_report(self):
         util.info("Created %s" % (self.tarpath,))

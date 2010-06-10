@@ -52,13 +52,14 @@ class InhibitorAction(object):
 
 
 class InhibitorSnapshot(InhibitorAction):
-    def __init__(self, snapshot_source, exclude=None, include=None):
+    def __init__(self, snapshot_source, name, exclude=None, include=None):
         super(InhibitorSnapshot, self).__init__(name='snapshot')
         self.dest       = None
         self.builddir   = None
         self.tarname    = None
         self.dest       = None
 
+        self.name       = name
         self.src        = snapshot_source
         self.src.keep   = True
         self.src.dest   = util.Path('/')
@@ -85,7 +86,6 @@ class InhibitorSnapshot(InhibitorAction):
 
     def get_action_sequence(self):
         return [
-            util.Step(self.fetch,    always=False),
             util.Step(self.sync,     always=False),
             util.Step(self.pack,     always=False),
         ]
@@ -93,13 +93,11 @@ class InhibitorSnapshot(InhibitorAction):
     def post_conf(self, inhibitor_state):
         super(InhibitorSnapshot, self).post_conf(inhibitor_state)
         self.src.post_conf(inhibitor_state)
+        self.src.init()
 
-        self.tarname    = 'snapshot-' + self.src.name
+        self.tarname    = 'snapshot-' + self.name
         self.dest       = inhibitor_state.paths.stages.pjoin(self.tarname+'.tar.bz2')
         self.builddir   = inhibitor_state.paths.build.pjoin(self.tarname)
-
-    def fetch(self):
-        self.src.fetch()
 
     def sync(self):
         if os.path.exists(self.builddir):
@@ -150,7 +148,6 @@ class InhibitorStage(InhibitorAction):
         self.istate = None
 
         self.setup_sequence = [
-            util.Step(self.get_sources,      always=False),
             util.Step(self.unpack_seed,      always=False),
             util.Step(self.sync_sources,     always=True),
             util.Step(self.profile_link,     always=False),
@@ -180,7 +177,7 @@ class InhibitorStage(InhibitorAction):
             'INHIBITOR_SCRIPT_ROOT':'/tmp/inhibitor/sh'
         }
 
-    def _chroot_failure(self, **ignored):
+    def _chroot_failure(self, **_):
         util.umount_all(self.istate.mount_points)
         
     def get_action_sequence(self):
@@ -210,7 +207,6 @@ class InhibitorStage(InhibitorAction):
             self.conf.portage_conf.keep = True
             self.conf.portage_conf.dest = util.Path('%s/etc/portage' % (self.portage_cf,))
             self.sources.append(self.conf.portage_conf)
-
 
         if len(portdir_overlay) > 0:
             self.ex_make_conf['PORTDIR_OVERLAY'] = ' '.join(portdir_overlay)
@@ -242,10 +238,7 @@ class InhibitorStage(InhibitorAction):
         
         for src in self.sources:
             src.post_conf(inhibitor_state)
-
-    def get_sources(self):
-        for src in self.sources:
-            src.fetch()
+            src.init()
 
     def unpack_seed(self):
         if not os.path.isdir(self.seed):
@@ -266,8 +259,6 @@ class InhibitorStage(InhibitorAction):
 
     def sync_sources(self):
         for src in self.sources:
-            if self.resume and src.keep:
-                continue
             src.install( root=self.builddir )
 
     def profile_link(self):
@@ -322,7 +313,8 @@ class InhibitorStage(InhibitorAction):
 
     def clean_sources(self):
         for src in self.sources:
-            src.clean(self.builddir)
+            src.remove()
+            src.finish()
 
     def cleanup(self):
         util.umount_all(self.istate.mount_points)
@@ -425,4 +417,10 @@ class InhibitorStage4(InhibitorStage):
                 fargs = {'cmdline': script.cmdline(), 'env':self.env},
                 failuref = self._chroot_failure,
             )
+
+    def clean_sources(self):
+        super(InhibitorStage4, self).clean_sources()
+        for script in self.scripts:
+            script.remove()
+            script.finish()
 

@@ -58,7 +58,7 @@ class Inhibitor(object):
         try:
             action.post_conf(self.state)
             action.run()
-        except Exception, e:
+        except Exception:
             util.umount_all(self.state.mount_points)
             raise
 

@@ -1,15 +1,26 @@
 import shutil
 import os
-import tarfile
 import types
-import time
 
 import util
 
+def create_source(src, **keywds):
+    ret = None
+    if type(src) == types.StringType:
+        if src.startswith("git://"):
+            ret = GitSource(src, **keywds)
+        elif src.startswith("file://"):
+            ret = FileSource(src, **keywds)
+    elif type(src) == types.FunctionType:
+        ret  = FuncSource(src, **keywds)
 
-class InhibitorSource(object):
+    if not ret:
+        raise util.InhibitorError("Unknown source type: %s" % (src,))
+    return ret
+
+class _GenericSource(object):
     """
-    Base class for source objects.
+    Generic source object.
 
     @param src                  - Source path.
     @param dest                 - Destination within the stage4 chroot.
@@ -18,200 +29,134 @@ class InhibitorSource(object):
                                   upon type.
     @param keep                 - Leave output in the stage4 build.
     @param rev                  - Revision of the source to use.  See
-                                  _GitSource.
-    """
-    def __init__(self, src, dest = None, name = None, keep = False, **keywds):
-        self.src        = src
-        self.dest       = dest
-        self.name       = name
-        self.keep       = keep
-        self.keywds     = keywds
-
-        self.backend    = None
-        self.cachedir   = None
-        self.istate     = None
-        self.fetched    = False
-
-    def _check(self):
-        if not self.istate:
-            raise util.InhibitorError(
-                "post_conf() not yet called for InhibitorSource %s" % self.name)
-    
-    def _init_backend(self):
-        if type(self.src) == types.StringType:
-            if self.src.startswith("git://"):
-                if self.name == None:
-                    self.name = self.src.split('/')[-1].rstrip('.git')
-                self.backend = GitSource(self.istate, self.name, self.src, self.keep, **self.keywds)
-            elif self.src.startswith("file://"):
-                if self.name == None:
-                    self.name = 'filecache-' + self.src.split('/')[-1]
-                self.backend = FileSource(self.istate, self.name, self.src, self.keep, **self.keywds)
-        elif type(self.src) == types.FunctionType:
-            if self.name == None:
-                self.name = 'funccache-' + self.src.func_name
-            self.backend = FuncSource(self.istate, self.name, self.src, self.keep, **self.keywds)
-
-        if self.backend == None:
-            raise util.InhibitorError("Unknown source type: %s" % (self.src,))
-
-    
-    def post_conf(self, inhibitor_state):
-        self.istate     = inhibitor_state
-        self._init_backend()
-        self.cachedir   = self.istate.paths.cache.pjoin(self.name)
-
-    def fetch(self):
-        """
-        Updates the cache. Does not catch and handle exceptions.
-
-        @param force        - If true, force cleaning of the cache.
-        """
-        self._check()
-        self.backend.fetch()
-        self.fetched = True
-
-    def install(self, root):
-        self._check()
-        if self.dest == None:
-            return
-#        if not self.fetched:
-#            self.fetch()
-        self.backend.install(root, self.dest)
-        
-
-    def clean(self, root):
-        self._check()
-        if self.dest == None or self.keep:
-            return
-        self.backend.clean(root, self.dest)
-
-    def pack(self):
-        self._check()
-        if not self.fetched:
-            self.fetch()
-        return self.backend.pack()
-
-class _GenericSource(object):
-    """
-    Generic source object.
-
+ 
     @param inhibitor_state      - Inhibitor Configuration
     @param src                  - Source path.
-    @param name                 - Unique identifier for this source object.
+    @param name                 - Identifier for this source object.
     """
-    def __init__(self, inhibitor_state, name, src, keep, ignore=None, **keywds):
-        self.istate     = inhibitor_state
-        self.name       = name
+    def __init__(self, src, 
+            inhibitor_state = None,
+            dest            = None,
+            keep            = False,
+            mountable       = False,
+            cachedir        = None,
+            ignore          = None,
+            **keywds                ):
         self.src        = src
+        self.istate     = inhibitor_state
+        self.dest       = dest
         self.keep       = keep
-        self.cachedir   = self.istate.paths.cache.pjoin(self.name)
-        self.src_is_dir = False
+        self.mountable  = mountable
+        self.cachedir   = cachedir
         self.mount      = None
+        self.installed  = []
 
-        # Some types are not cached as there is no reason
-        self.sync_src   = self.cachedir
-       
         if ignore:
             self.ignore = ignore
         else:
             self.ignore = shutil.ignore_patterns('.svn', '.git', '*.swp')
 
-    def clean_cache(self, force=False):
-        if self.src_is_dir and force:
-            if os.path.exists(self.cachedir):
-                shutil.rmtree(self.cachedir)
+    def post_conf(self, inhibitor_state):
+        self.istate = inhibitor_state
+        if self.cachedir and not self.cachedir.startswith(self.istate.paths.cache):
+            self.cachedir = self.istate.paths.cache.pjoin(self.cachedir)
  
-    def fetch(self):
-        raise util.InhibitorError("fetch() is undefined for %s" % (self.name,))
+    def init(self):
+        raise util.InhibitorError("init() is undefined for %s" % (self.src,))
 
-    def clean(self, root, dest):
+    def file_copy_callback(self, _, targ):
+        self.installed.append(targ)
+
+    def remove(self):
         if self.mount:
             util.umount(self.mount, self.istate.mount_points)
-        else:
-            if not self.src_is_dir:
-                os.unlink(root.pjoin(dest))
-            else:
-                shutil.rmtree(root.pjoin(dest))
+        elif not self.keep:
+            for f in self.installed:
+                d = os.path.dirname(f)
+                os.unlink(f)
+                if len( os.listdir(d) ) == 0:
+                    os.rmdir(d)
 
-    def pack(self):
-        if self.src_is_dir:
-            util.warn("Refusing to pack source %s as it's a file" % (self.name))
+    def finish(self):
+        if not self.cachedir:
             return
+        shutil.rmtree(self.cachedir)
 
-        fpath = self.cachedir + '.tar.bz2'
-        util.dbg("Creating %s from %s" % (fpath, self.cachedir))
-        archive = tarfile.open(fpath, 'w:bz2')
-        for root, dirs, files in os.walk(self.cachedir):
-            include = dirs[:]
-            include.extend(files)
-            striplen = len(self.cachedir) + 1
-            for f in include:
-                if f in ('.svn', '.git'):
-                    continue
-                full_path = os.path.join(root, f)
-                archive.add(full_path,
-                    arcname = full_path[striplen:],
-                    recursive = False )
-        archive.close()
-        return fpath
+    def install(self, root):
+        src = self.src
+        if self.cachedir:
+            src = self.cachedir
+        full_dest = root.pjoin(self.dest)
 
-    def install(self, root, dest):
-        full_dest = root.pjoin(dest)
-        if self.keep:
+        if not self.keep and self.mountable:
+            util.dbg("Bind mounting %s at %s" % (src, full_dest))
+            self.mount = util.Mount(src, self.dest, root)
+            util.mount(self.mount, self.istate.mount_points)
+        else:
             util.path_sync(
-                self.sync_src,
+                src, 
                 full_dest,
                 root = root,
-                ignore = self.ignore
+                ignore = self.ignore,
+                file_copy_callback = self.file_copy_callback
             )
-        else:
-            util.dbg("Bind mounting %s at %s" % (self.cachedir, full_dest))
-            self.mount = util.Mount(self.cachedir, dest, root)
-            util.mount(self.mount, self.istate.mount_points)
         return
 
 class FileSource(_GenericSource):
-    def __init__(self, inhibitor_state, name, src, keep, **keywds):
-        real_src = util.Path(src[6:])
-        super(FileSource, self).__init__(inhibitor_state, name, real_src, keep, **keywds)
-        if not os.path.lexists(self.src):
-            raise util.InhibitorError("Path %s does not exist" % self.src)
-        if os.path.isdir(self.src):
-            self.src_is_dir = True
-        self.sync_src = self.src
-            
-    def fetch(self):
-        self.clean_cache(force=True)
-        util.path_sync(
-            self.src,
-            self.cachedir,
-            ignore=self.ignore,
-            root = self.src)
+    def __init__(self, src, inhibitor_state = None, dest = None, keep = False, **keywds):
+        real_src    = util.Path(src[6:])
+        mountable   = False
+
+        if not os.path.lexists(real_src):
+            raise util.InhibitorError("Path %s does not exist" % real_src)
+        elif os.path.isdir(real_src):
+            mountable = True
+
+        super(FileSource, self).__init__(
+            src             = real_src,
+            inhibitor_state = inhibitor_state,
+            dest            = dest,
+            keep            = keep,
+            mountable       = mountable,
+            **keywds
+        )
+
+    def init(self):
+        # No need to fetch, we either bind mount or copy depending on if this
+        # will be left in the chroot and is a directory or not.
+        return
 
 
 class FuncSource(_GenericSource):
-    def __init__(self, inhibitor_state, name, src, keep, **keywds):
-        super(FuncSource, self).__init__(inhibitor_state, name, src, keep, **keywds)
-        self.keywds = keywds
-        self.output = None
-
-    def fetch(self):
-        self.output = self.src(self.keywds)
+    def __init__(self, src, inhibitor_state = None, dest = None, keep = False, **keywds):
+        self.output = src(**keywds)
         if not type(self.output) in (types.DictType, types.StringType):
             raise util.InhibitorError("Function %s returned invalid type %s"
-                % (self.name, str(type(self.output))) )
+                % (src.func_name, str(type(self.output))) )
+        super(FuncSource, self).__init__(
+            src             = src,
+            inhibitor_state = inhibitor_state,
+            dest            = dest,
+            keep            = keep,
+            **keywds
+        )
+
+    def init(self):
+        # Fetching of the output is done during init as it has to happen every
+        # time anyways.
+        return
 
     def _write_dictionary(self, destdir, d):
         for k, v in d.items():
             if type(v) == types.StringType:
                 self._write_file(destdir.pjoin(k), v)
             else:
-                os.makedirs(destdir.pjoin(k))
+                destpath = destdir.pjoin(k)
+                if not os.path.lexists( destpath ):
+                    os.makedirs(destdir.pjoin(k))
                 self._write_dictionary(destdir.pjoin(k), v)
 
-    @staticmethod
-    def _write_file(path, value):
+    def _write_file(self, path, value):
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
         # Find the indentation level of the first line so we can strip
@@ -225,18 +170,12 @@ class FuncSource(_GenericSource):
         for line in value.splitlines():
             f.write(line[strip:]+'\n')
         f.close()
+        self.file_copy_callback(None, path)
  
-    def install(self, root, dest):
-        if self.output == None:
-            # In case we're resuming a build where the fetch step was skipped.
-            self.fetch()
-
-        realdest = root.pjoin(dest)
+    def install(self, root):
+        realdest = root.pjoin(self.dest)
         if not os.path.exists( os.path.dirname(realdest) ):
             os.makedirs( os.path.dirname(realdest) )
-
-        if type(self.output) == types.DictType:
-            nkeys = len(self.output.keys())
 
         if type(self.output) == types.StringType:
             util.dbg("Writing string output to %s" % (realdest,))
@@ -252,16 +191,26 @@ class GitSource(_GenericSource):
     cachedir and instead pull from the origin and checkout branches.
     """
 
-    def __init__(self, inhibitor_state, name, src, keep, **keywds):
-        super(GitSource, self).__init__(inhibitor_state, name, src, keep, **keywds)
-        self.src_is_dir     = True
-        if 'rev' in keywds:
-            self.rev        = keywds['rev']
-        else:
-            self.rev        = 'HEAD'
-        self.cleaned_cache  = False
-        self.gitdir         = self.cachedir.pjoin('.git')
-        self.env            = {'GIT_DIR':self.gitdir}
+    def __init__(self, src, inhibitor_state = None, dest = None, keep = False, rev = None, **keywds):
+        self.env        = {}
+        self.gitdir     = None
+        self.rev        = rev or 'HEAD'
+        cachedirname    = src.split('/')[-1].rstrip('.git')
+
+        super(GitSource, self).__init__(
+            src             = src,
+            inhibitor_state = inhibitor_state,
+            dest            = dest,
+            keep            = keep,
+            mountable       = True,
+            cachedir        = cachedirname,
+            **keywds
+        )
+        
+    def post_conf(self, inhibitor_status):
+        super(GitSource, self).post_conf(inhibitor_status)
+        self.gitdir = self.cachedir.pjoin('.git')
+        self.env    = {'GIT_DIR':self.gitdir}
 
     def _get_remote_fetch(self):
         """
@@ -276,13 +225,7 @@ class GitSource(_GenericSource):
                 remotes.append(url)
         return remotes
 
-    def clean_cache(self, force=False):
-        self.cleaned_cache = True
-       
-        if force and os.path.exists(self.cachedir):
-            shutil.rmtree(self.cachedir)
-            return
-
+    def clean_cache(self):
         if os.path.isdir(self.gitdir):
             if not self.src in self._get_remote_fetch():
                 util.warn("Deleting %s as %s is not in the remote list"
@@ -294,9 +237,8 @@ class GitSource(_GenericSource):
             util.warn("Removing non - git clone %s" % (self.cachedir,))
             shutil.rmtree(self.cachedir)
 
-    def fetch(self):
-        if not self.cleaned_cache:
-            self.clean_cache(force=False)
+    def init(self):
+        self.clean_cache()
 
         if os.path.isdir(self.gitdir):
             util.cmd('git reset --hard HEAD', env=self.env, chdir=self.cachedir)
@@ -316,61 +258,54 @@ class GitSource(_GenericSource):
             _, self.rev = util.cmd_out('git rev-parse HEAD', env=self.env)
             self.rev = self.rev[:7]
 
-    def clean(self, root, dest):
-        super(GitSource, self).clean(root, dest)
-        _, branches = util.cmd_out('git branch -l', env=self.env)
-        if 'inhibitor' in branches:
-            util.cmd('git checkout master', env=self.env, chdir=self.cachedir)
-            util.cmd('git branch -D inhibitor', env=self.env)
-
-    def pack(self):
-        tarpath = "%s-%s.tar.bz2" % (self.name, self.rev)
-        tarpath = os.path.dirname(self.cachedir) + '/' + tarpath
-        util.cmd('git archive --format=tar %s | bzip2 --fast -f > %s'
-            % (self.rev, tarpath),
-            env=self.env, chdir=self.cachedir)
-        return tarpath
+    def finish(self):
+        self.clean_cache()
 
 
-class InhibitorScript(InhibitorSource):
-    def __init__(self, name, src, args = None, needs=[], **keywds):
-        super(InhibitorScript, self).__init__(
+class InhibitorScript(object):
+    def __init__(self, name, src, args = [], needs=[], **keywds):
+        self.local_src = util.Path('/tmp/inhibitor/sh/').pjoin(name)
+        self.script = create_source( 
             src,
-            dest = util.Path('/tmp/inhibitor/sh').pjoin(name),
-            name = name,
-            keep = True,
-            **keywds)
-        if args != None:
-            if type(args) == types.StringType:
-                self.args = args.split(" ")
-            elif type(args) == types.ListType:
-                self.args = args
-            else:
-                raise util.InhibitorError("Arguments to script %s are not a string or list" % name)
-        else:
-            self.args = []
+            keep = False,
+            dest = self.local_src )
 
+        self.args = util.strlist_to_list(args)
         self.reqs = []
-        if type(needs) == InhibitorSource:
+
+        if type(needs) != types.ListType:
             needs = [needs]
+
         for need in needs:
-            need.dest = util.Path('/tmp/inhibitor/sh').pjoin(os.path.basename(need.src))
-            need.keep = True
+            need.dest = util.Path('/tmp/inhibitor/sh') #.pjoin(os.path.basename(need.src))
+            need.keep = False
             self.reqs.append(need)
 
     def post_conf(self, inhibitor_state):
-        super(InhibitorScript, self).post_conf(inhibitor_state)
+        self.script.post_conf(inhibitor_state)
+        self.script.init()
         for req in self.reqs:
             req.post_conf(inhibitor_state)
+            req.init()
     
     def install(self, root):
-        super(InhibitorScript, self).install(root)
-        os.chmod(root.pjoin(self.dest), 0755)
+        self.script.install(root)
+        os.chmod(root.pjoin(self.local_src), 0755)
         for req in self.reqs:
             req.install(root)
 
+    def remove(self):
+        self.script.remove()
+        for req in self.reqs:
+            req.remove()
+
+    def finish(self):
+        self.script.finish()
+        for req in self.reqs:
+            req.finish()
+
     def cmdline(self):
-        cmd = '/tmp/inhibitor/sh/%s' % (self.name,)
+        cmd = str(self.local_src)
         if self.args:
             for arg in self.args:
                 cmd += " '%s'" % (arg,)

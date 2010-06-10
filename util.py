@@ -6,6 +6,8 @@ import os.path
 import shutil
 import glob
 import traceback
+import signal
+import time
 
 # XXX:  To remove
 try:
@@ -18,7 +20,8 @@ INHIBITOR_DEBUG = False
 class InhibitorError(Exception):
     def __init__(self, message, **keywds):
         super(InhibitorError, self).__init__(message)
-        print;print
+        print
+        print
         err("Exception Raised:  Cleaning up.\n")
 
     def __str__(self):
@@ -41,7 +44,7 @@ class Path(types.StringType):
 class Container(object):
     def __init__(self, **keys):
         self.keys = []
-        for k,v in keys.items():
+        for k, v in keys.items():
             setattr(self, k, v)
             self.keys.append(k)
 
@@ -65,6 +68,7 @@ class Mount(object):
 
 class Step(Container):
     def __init__(self, function, always=True, **keywds):
+        self.function = types.FunctionType
         super(Step, self).__init__(function=function, always=always, **keywds)
         self.name = function.func_name
 
@@ -82,49 +86,48 @@ def err(message):
     print "\001\033[0;31m\002*\001\033[0m\002 %s" % message
 
 def dbg(message):
-    global INHIBITOR_DEBUG
     if INHIBITOR_DEBUG:
         print "\001\033[1;36m\002*\001\033[0m\002 %s" % message
         sys.stdout.flush()
 
 
 # Mounting utilities
-def mount(mount, mounts, options='-o bind'):
-    if mount in mounts:
+def mount(mp, mounts, options='-o bind'):
+    if mp in mounts:
         dbg("src=%s dest=%s root=%s already mounted" 
-            % (mount.src, mount.dest, mount.root))
+            % (mp.src, mp.dest, mp.root))
         return
 
-    full_dest = mount.root.pjoin(mount.dest)
+    full_dest = mp.root.pjoin(mp.dest)
     if not os.path.isdir(full_dest):
         os.makedirs(full_dest)
-        mount.rmdir = True
-    cmd('mount ' + options + ' %s %s' % (mount.src, mount.root.pjoin(mount.dest)) )
-    mounts.append(mount)
+        mp.rmdir = True
+    cmd('mount ' + options + ' %s %s' % (mp.src, mp.root.pjoin(mp.dest)) )
+    mounts.append(mp)
 
-def umount(mount, mounts):
-    if not mount in mounts:
+def umount(mp, mounts):
+    if not mp in mounts:
         dbg("src=%s dest=%s root=%s not mounted" 
-            % (mount.src, mount.dest, mount.root))
+            % (mp.src, mp.dest, mp.root))
         return
 
-    while mount in mounts:
-        mounts.remove( mount )
+    while mp in mounts:
+        mounts.remove( mp )
 
-    fp = mount.root.pjoin(mount.dest)
+    fp = mp.root.pjoin(mp.dest)
     if cmd('umount %s' % fp, raise_exception=False) != 0:
         warn('Unmount of %s failed.' % fp)
-        warn('Killing any processes still running in %s' % mount.root)
+        warn('Killing any processes still running in %s' % mp.root)
         pl = []
         for root in glob.glob('/proc/[0-9][0-9]*/root'):
-            if os.readlink(root).startswith(mount.root):
+            if os.readlink(root).startswith(mp.root):
                 pl.append( root[len('/proc/'):-len('/root')] )
         _kill_pids(pl)
 
         if cmd('umount %s' % fp, raise_exception=False) != 0:
             err('Cound not unmount %s' % fp)
             return False
-    if mount.rmdir:
+    if mp.rmdir:
         shutil.rmtree(fp)
     return True
 
@@ -149,11 +152,10 @@ def _kill_pids(pids, ignore_exceptions=True):
         except OSError, e:
             if ignore_exceptions:
                 warn('Child process %d failed to die' % (p,))
-                pass
-            if not e.errno in [10,3]:
+            if not e.errno in (10, 3):
                 raise e
     
-def _spawn(cmdline, env={}, return_output=False, show_output=True, timeout=0, exe=None, chdir=None):
+def _spawn(cmdline, env={}, return_output=False, timeout=0, exe=None, chdir=None):
     if type(cmdline) == types.StringType:
         cmdline = cmdline.split()
 
@@ -175,7 +177,7 @@ def _spawn(cmdline, env={}, return_output=False, show_output=True, timeout=0, ex
         _kill_pids(child.pid)
         raise
     except OSError, e:
-        raise InhibitorException("Failed to spawn '%s': %s" % (cmdline, e))
+        raise InhibitorError("Failed to spawn '%s': %s" % (cmdline, e))
         
     if timeout == 0:
         ret = child.wait()
@@ -184,14 +186,14 @@ def _spawn(cmdline, env={}, return_output=False, show_output=True, timeout=0, ex
         ctime = start_time
         while True:
             time.sleep(1)
-            ret = subprocess.poll()
+            ret = child.poll()
             if ret != None:
                 break
             
             ctime = time.time()
             if (start_time + timeout) >= ctime:
-                _kill_pids(subprocess.pid)
-                raise InhibitorException("Timeout (%d seconds) waiting for '%s'"
+                _kill_pids(child.pid)
+                raise InhibitorError("Timeout (%d seconds) waiting for '%s'"
                     % (int(timeout), cmdline))
 
     if return_output:
@@ -203,7 +205,7 @@ def _spawn(cmdline, env={}, return_output=False, show_output=True, timeout=0, ex
     return ret
 
 def _spawn_sh(cmdline, env, chdir=None, return_output=False, shell='/bin/bash'):
-    args=[shell, '-c']
+    args = [shell, '-c']
     if '|' in cmdline:
         # Make sure we get a real return value.
         cmdline = "set -o pipefail;" + cmdline 
@@ -261,7 +263,7 @@ def cmd_out(cmdline, env={}, raise_exception=True, chdir=None, shell='/bin/bash'
 def chroot(path, function, failuref=None, fargs={}, failure_args={}):
     orig_root = os.open('/', os.O_RDONLY)
     orig_dir = os.path.realpath(os.curdir)
-    old_env ={}
+    old_env = {}
     old_env.update(os.environ)
     try:
         os.chroot(path)
@@ -300,7 +302,7 @@ def make_conf_dict(path):
     else:
         return {}
 
-def write_dict_bash(dict, path):
+def write_dict_bash(bd, path):
     if type(path) == types.StringType:
         path = Path(path)
 
@@ -308,13 +310,13 @@ def write_dict_bash(dict, path):
         os.makedirs(os.path.dirname(path))
 
     f = open(path, 'w')
-    keys = dict.keys()
+    keys = bd.keys()
     keys.sort()
     for k in keys:
-        f.write('%s="%s"\n' % (k,dict[k]))
+        f.write('%s="%s"\n' % (k, bd[k]))
     f.close()
 
-def path_sync(src, targ, root='/', ignore=lambda x,y: [], file_copy_callback=None):
+def path_sync(src, targ, root='/', ignore=lambda x, y: [], file_copy_callback=None):
     """
     TODO:  This is confusing enough it should probably be documented.
     """
@@ -395,3 +397,4 @@ def strlist_to_list( strlist ):
         ret = strlist
     else:
         raise InhibitorError("Cannot convert object to list.  %s" % (strlist,))
+    return ret
