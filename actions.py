@@ -22,7 +22,8 @@ class InhibitorAction(object):
         return []
 
     def post_conf(self, inhibitor_state):
-        self.statedir = inhibitor_state.paths.state.pjoin(self.name)
+        self.istate     = inhibitor_state
+        self.statedir   = inhibitor_state.paths.state.pjoin(self.name)
         if os.path.isdir(self.statedir) and not self.resume:
             self.clear_resume()
             os.makedirs(self.statedir)
