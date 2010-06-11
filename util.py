@@ -398,3 +398,9 @@ def strlist_to_list( strlist ):
     else:
         raise InhibitorError("Cannot convert object to list.  %s" % (strlist,))
     return ret
+
+def mkdir( path ):
+    if not os.path.lexists(path):
+        os.makedirs(path)
+    return path
+
