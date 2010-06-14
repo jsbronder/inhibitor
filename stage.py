@@ -125,7 +125,7 @@ class BaseStage(actions.InhibitorAction):
                 self.env['PORTDIR_OVERLAY'] += ' /tmp/inhibitor/overlays/%d' % i
                 i += 1
 
-        for i in glob.iglob( self.istate.paths.share.pjoin('*.sh') ):
+        for i in glob.iglob( self.istate.paths.share.pjoin('sh/*.sh') ):
             j = source.create_source(
                     "file://%s" % i,
                     keep = False,
@@ -142,7 +142,7 @@ class BaseStage(actions.InhibitorAction):
         if self.conf.has('make_conf'):
             mc = self.conf.make_conf
         else:
-            mc = make_conf_source( source='/etc/make.conf')
+            mc = source.create_source(make_conf_source, source='/etc/make.conf')
         mc.dest = self.portage_cr.pjoin('etc/make.conf')
         mc.keep = True
         self.sources.append(mc)
@@ -165,11 +165,11 @@ class BaseStage(actions.InhibitorAction):
             src.install( root = self.target_root )
 
     def make_profile_link(self):
-        targ = self.target_root.pjoin(self.portage_cr + '/etc/make.profile')
+        targ = self.target_root.pjoin( self.portage_cr.pjoin('/etc/make.profile') )
         util.mkdir( os.path.dirname(targ) )
         if os.path.lexists(targ):
             os.unlink(targ)
-            os.symlink('/usr/portage/profiles/%s' % self.conf.profile, targ)
+        os.symlink(self.env['PORTDIR'] + '/profiles/%s' % self.profile, targ)
 
     def remove_sources(self):
         for src in self.sources:
