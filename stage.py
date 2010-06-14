@@ -100,6 +100,13 @@ class BaseStage(actions.InhibitorAction):
             self.conf.snapshot.keep = False
             self.conf.snapshot.dest = util.Path( self.env['PORTDIR'] )
             self.sources.append(self.conf.snapshot)
+        else:
+            rc, portdir = util.cmd_out('portageq portdir', raise_exception=True)
+            self.sources.append( 
+                source.create_source( 'file://' + portdir,
+                    keep = False,
+                    dest = util.Path( self.env['PORTDIR'] ))
+            )
 
         if self.conf.has('overlays'):
             i = 0
