@@ -47,21 +47,29 @@ class BaseStage(actions.InhibitorAction):
         self.root           = util.Path('/')
         self.portage_cr     = util.Path('/tmp/inhibitor/portage_configroot')
 
-        if 'root' in keywds:
-            self.root       = keywds['root']
-        if 'portage_cr' in keywds:
-            self.portage_cr = keywds['portage_cr']
-
         self.env            = {
             'PKGDIR':                   '/tmp/inhibitor/pkgs',
             'DISTDIR':                  '/tmp/inhibitor/dist',
             'INHIBITOR_SCRIPT_ROOT':    '/tmp/inhibitor/sh',
             'ROOT':                     self.root,
             'PORTAGE_CONFIGROOT':       self.portage_cr,
-            'PORTDIR_OVERLAY':          '',
             'PORTDIR':                  '/tmp/inhibitor/portdir'
         }
+
+        if self.conf.has('overlays'):
+            self.env['PORTDIR_OVERLAY'] = ''
         super(BaseStage, self).__init__(self.build_name, **keywds)
+
+    def update_root(self, new_root):
+        self.root = new_root
+        self.env['ROOT'] = new_root
+
+    def update_portage_cr(self, new_portage_cr):
+        self.portage_cr = new_portage_cr
+        self.env['PORTAGE_CONFIGROOT'] = new_portage_cr
+
+    def chroot_failure(self, _):
+        util.umount_all(self.istate.mount_points)
 
     def post_conf(self, inhibitor_state):
         super(BaseStage, self).post_conf(inhibitor_state)
