@@ -241,10 +241,10 @@ class GitSource(_GenericSource):
         self.clean_cache()
 
         if os.path.isdir(self.gitdir):
-            util.cmd('git reset --hard HEAD', env=self.env, chdir=self.cachedir)
-            util.cmd('git clean -f', env=self.env, chdir=self.cachedir)
-            util.cmd('git checkout master', env=self.env, chdir=self.cachedir)
-            util.cmd('git pull', env=self.env)
+            util.cmd('git reset --hard HEAD',   env=self.env, chdir=self.cachedir)
+            util.cmd('git clean -f',            env=self.env, chdir=self.cachedir)
+            util.cmd('git checkout master',     env=self.env, chdir=self.cachedir)
+            util.cmd('git pull',                env=self.env, chdir=self.cachedir)
         else:
             util.cmd('git clone %s %s' % (self.src, self.cachedir))
 
