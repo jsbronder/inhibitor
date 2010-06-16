@@ -277,7 +277,7 @@ class InhibitorScript(object):
             needs = [needs]
 
         for need in needs:
-            need.dest = util.Path('/tmp/inhibitor/sh') #.pjoin(os.path.basename(need.src))
+            need.dest = util.Path('/tmp/inhibitor/sh').pjoin(os.path.basename(need.src))
             need.keep = False
             self.reqs.append(need)
 
