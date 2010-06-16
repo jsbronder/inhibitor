@@ -207,4 +207,173 @@ class BaseStage(actions.InhibitorAction):
             util.Step(self.clean_tmp,           always=True),
         ]
 
+class Stage4(BaseStage):
+    def __init__(self, stage_conf, build_name, **keywds):
+        self.kerndir        = None
+        self.package_list   = []
+        self.scripts        = []
+        self.tarpath        = None
+        self.seed           = None
+        self.kernel         = None
+
+        super(Stage4, self).__init__(stage_conf, build_name, 'stage4', **keywds)
+        self.emerge_cmd     = '%s/inhibitor-run.sh run_emerge ' % (self.env['INHIBITOR_SCRIPT_ROOT'],)
+
+        if self.conf.has('seed'):
+            self.seed = self.conf.seed
+        else:
+            raise InhibitorError('No seed stage specified')
+
+    def post_conf(self, inhibitor_state):
+        super(Stage4, self).post_conf(inhibitor_state)
+        self.seed       = self.istate.paths.stages.pjoin(self.seed)
+        self.tarpath    = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
+        
+        if self.conf.has('scripts'):
+            self.scripts = self.conf.scripts
+            for script in self.conf.scripts:
+                script.post_conf(inhibitor_state)
+
+        if self.conf.has('packages'):
+            self.package_list = util.strlist_to_list(self.conf.packages)
+        else:
+            raise util.InhibitorError('No packages specified')
+        
+        if self.conf.has('kernel'):
+            self.kernel = self.conf.kernel
+            if not self.kernel.has('kconfig'):
+                raise util.InhibitorError('No kernel config (kconfig) specified.')
+            else:
+                self.kernel.kconfig.keep = False
+                self.kernel.kconfig.dest = util.Path('/tmp/inhibitor/kconfig')
+                self.kernel.kconfig.post_conf(inhibitor_state)
+                self.sources.append(self.kernel.kconfig)
+            if not self.kernel.has('kernel_pkg'):
+                raise util.InhibitorError('No kernel package (kernel_pkg) specified.')
+
+    def _emerge(self, packages, flags=''):
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {
+                'cmdline': '%s %s %s' % (
+                    self.emerge_cmd,
+                    flags,
+                    packages
+                ),
+                'env': self.env
+            },
+            failuref = self.chroot_failure 
+        )
+
+    def get_action_sequence(self):
+        ret = []
+        ret.append( util.Step(self.unpack_seed,             always=False)    )
+        ret.append( util.Step(self.install_sources,         always=True)    )
+        ret.append( util.Step(self.make_profile_link,       always=False)   )
+        ret.append( util.Step(self.merge_preperation,       always=True)   )
+        ret.append( util.Step(self.merge_portage,           always=False)   )
+        ret.append( util.Step(self.merge_system,            always=False)   )
+        ret.append( util.Step(self.merge_packages,          always=False)   )
+        ret.append( util.Step(self.merge_kernel,            always=False)   )
+        ret.append( util.Step(self.run_scripts,             always=False)   )
+        ret.append( util.Step(self.remove_sources,          always=True)    )
+        ret.append( util.Step(self.finish_sources,          always=True)    )
+        ret.append( util.Step(self.restore_profile_link,    always=False)   )
+        ret.append( util.Step(self.clean_tmp,               always=True)    )
+        ret.append( util.Step(self.pack,                    always=False)   )
+        return ret
+
+    def unpack_seed(self):
+        if not os.path.isdir(self.seed):
+            if os.path.exists(self.seed):
+                os.unlink(self.seed)
+            seedfile = self.seed + '.tar.bz2'
+            util.info("Unpacking %s" % seedfile)
+            os.makedirs(self.seed)
+            try:
+                util.cmd('tar -xjpf %s -C %s/' % (seedfile, self.seed))
+            except:
+                shutil.rmtree(self.seed)
+                raise
+
+        util.info("Syncing %s to %s" % (self.seed.dname(), self.target_root.dname()) )
+        util.cmd('rsync -a --delete %s %s' %
+            (self.seed.dname(), self.target_root.dname()) )
+
+    def merge_preperation(self):
+        for m in ('proc', 'sys', 'dev'):
+            util.mount( self.aux_mounts[m], self.istate.mount_points )    
+        for m in ('resolv.conf', 'hosts'):
+            self.aux_sources[m].install( root = self.target_root )
+
+    def merge_portage(self):
+        self._emerge('virtual/portage', flags='--oneshot --newuse')
+
+    def merge_system(self):
+        self._emerge('system', flags='--deep --newuse')
+
+    def merge_packages(self):
+        package_str = ' '.join(self.package_list)
+        package_str = package_str.replace('\n', ' ')
+        self._emerge(package_str, flags='--deep --newuse')
+
+    def merge_kernel(self):
+        args = ['--build_name', self.build_name,
+            '--kernel_pkg', self.kernel.kernel_pkg]
+
+        if self.kernel.has('genkernel'):
+            args.extend(['--genkernel', self.kernel.genkernel])
+        if self.kernel.has('packages'):
+            args.extend(['--packages', self.kernel.packages])
+
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {
+                'cmdline': '%s/kernel.sh %s' % ( self.env['INHIBITOR_SCRIPT_ROOT'], ' '.join(args),),
+                'env': self.env
+            },
+            failuref = self.chroot_failure,
+        )
+
+    def run_scripts(self):
+        for script in self.scripts: 
+            script.install( root = self.target_root )
+            util.chroot(
+                path = self.target_root,
+                function = util.cmd,
+                fargs = {'cmdline': script.cmdline(), 'env':self.env},
+                failuref = self.chroot_failure
+            )
+
+    def remove_sources(self):
+        super(Stage4, self).remove_sources()
+        for script in self.scripts:
+            script.remove()
+
+        for m in ('proc', 'sys', 'dev'):
+            util.umount( self.aux_mounts[m], self.istate.mount_points )
+
+        for m in ('resolv.conf', 'hosts'):
+            self.aux_sources[m].remove()
+
+    def finish_sources(self):
+        super(Stage4, self).finish_sources()
+        for script in self.scripts:
+            script.finish()
+
+        for m in ('resolv.conf', 'hosts'):
+            self.aux_sources[m].finish()
+
+
+    def pack(self):
+        archive = tarfile.open(self.tarpath, 'w:bz2')
+        archive.add(self.target_root,
+            arcname = '/',
+            recursive = True
+        )
+        archive.close()
+        util.info("Created %s" % (self.tarpath,))
+
 
