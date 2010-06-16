@@ -209,7 +209,6 @@ class BaseStage(actions.InhibitorAction):
 
 class Stage4(BaseStage):
     def __init__(self, stage_conf, build_name, **keywds):
-        self.kerndir        = None
         self.package_list   = []
         self.scripts        = []
         self.tarpath        = None
@@ -225,6 +224,13 @@ class Stage4(BaseStage):
             raise InhibitorError('No seed stage specified')
 
     def post_conf(self, inhibitor_state):
+        kerncache = source.create_source(
+            "file://%s" % util.mkdir(inhibitor_state.paths.kernel.pjoin(self.build_name)),
+            keep = False,
+            dest = '/tmp/inhibitor/kerncache'
+        )
+        self.sources.append(kerncache)
+
         super(Stage4, self).post_conf(inhibitor_state)
         self.seed       = self.istate.paths.stages.pjoin(self.seed)
         self.tarpath    = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
