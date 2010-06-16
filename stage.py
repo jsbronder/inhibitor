@@ -2,6 +2,8 @@ import os
 import util
 import glob
 import re
+import shutil
+import tarfile
 
 import actions
 import source
@@ -68,7 +70,7 @@ class BaseStage(actions.InhibitorAction):
         self.portage_cr = new_portage_cr
         self.env['PORTAGE_CONFIGROOT'] = new_portage_cr
 
-    def chroot_failure(self, _):
+    def chroot_failure(self):
         util.umount_all(self.istate.mount_points)
 
     def post_conf(self, inhibitor_state):
@@ -83,7 +85,7 @@ class BaseStage(actions.InhibitorAction):
             'dev':  util.Mount('/dev',  '/dev',  self.target_root),
         }
         self.aux_sources = {
-            'resolve.conf': source.create_source(
+            'resolv.conf': source.create_source(
                     'file://etc/resolv.conf', keep = True, dest = '/etc/resolv.conf'),
             'hosts':        source.create_source(
                     'file://etc/hosts', keep = True, dest = '/etc/hosts'),
@@ -165,28 +167,44 @@ class BaseStage(actions.InhibitorAction):
             src.install( root = self.target_root )
 
     def make_profile_link(self):
-        targ = self.target_root.pjoin( self.portage_cr.pjoin('/etc/make.profile') )
-        util.mkdir( os.path.dirname(targ) )
-        if os.path.lexists(targ):
-            os.unlink(targ)
-        os.symlink(self.env['PORTDIR'] + '/profiles/%s' % self.profile, targ)
+        # XXX:  We also need to make the root profile link, Gentoo Bug 324179.
+        for dir in (self.target_root, self.target_root.pjoin(self.portage_cr)):
+            targ = dir.pjoin('/etc/make.profile')
+            print targ
+            util.mkdir( os.path.dirname(targ) )
+            if os.path.lexists(targ):
+                os.unlink(targ)
+            os.symlink(self.env['PORTDIR'] + '/profiles/%s' % self.profile, targ)
 
     def remove_sources(self):
         for src in self.sources:
             src.remove()
 
-    def clean_sources(self):
+    def finish_sources(self):
         for src in self.sources:
             src.finish()
         for _, src in self.aux_sources.items():
             if not src in self.sources:
                 src.finish()
 
+    def restore_profile_link(self):
+        # XXX:  See make_profile_link.
+        targ = self.target_root.pjoin('/etc/make.profile')
+        if os.path.lexists(targ):
+            os.unlink(targ)
+        os.symlink('../usr/portage/profiles/%s' % self.profile, targ)
+
+    def clean_tmp(self):
+        shutil.rmtree(self.target_root.pjoin('/tmp/inhibitor'))
+
     def get_action_sequence(self):
         return [
             util.Step(self.install_sources,     always=True),
             util.Step(self.make_profile_link,   always=True),
             util.Step(self.remove_sources,      always=True),
-            util.Step(self.clean_sources,       always=True)
+            util.Step(self.finish_sources,      always=True),
+            util.Step(self.restore_profile_link,always=True),
+            util.Step(self.clean_tmp,           always=True),
         ]
-    
+
+
