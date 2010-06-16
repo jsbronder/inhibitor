@@ -78,7 +78,7 @@ class EmbeddedStage(stage.BaseStage):
 
     def get_action_sequence(self):
         ret = []
-        ret.append( util.Step(self.install_sources,             always=False)   )
+        ret.append( util.Step(self.install_sources,             always=True)    )
         ret.append( util.Step(self.make_profile_link,           always=False)   )
         ret.append( util.Step(self.merge_packages,              always=False)   )
         ret.append( util.Step(self.target_merge_busybox,        always=False)   )
