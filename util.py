@@ -120,8 +120,13 @@ def umount(mp, mounts):
         warn('Killing any processes still running in %s' % mp.root)
         pl = []
         for root in glob.glob('/proc/[0-9][0-9]*/root'):
-            if os.readlink(root).startswith(mp.root):
-                pl.append( root[len('/proc/'):-len('/root')] )
+            try:
+                if os.readlink(root).startswith(mp.root):
+                    pl.append( root[len('/proc/'):-len('/root')] )
+            except OSError, e:
+                # Catch the process having already exited.
+                if e.errno == 2:
+                    continue
         _kill_pids(pl)
 
         if cmd('umount -f %s' % fp, raise_exception=False) != 0:
@@ -142,6 +147,7 @@ def _kill_pids(pids, ignore_exceptions=True):
         pids = [pids]
 
     for p in pids:
+        p = int(p)
         if p == -1:
             continue
         try:
@@ -151,7 +157,7 @@ def _kill_pids(pids, ignore_exceptions=True):
                 os.waitpid(p, 0)
         except OSError, e:
             if ignore_exceptions:
-                warn('Child process %d failed to die' % (p,))
+                warn('Child process %d already exited or failed to die' % (p,))
             if not e.errno in (10, 3):
                 raise e
     
@@ -180,7 +186,12 @@ def _spawn(cmdline, env={}, return_output=False, timeout=0, exe=None, chdir=None
         raise InhibitorError("Failed to spawn '%s': %s" % (cmdline, e))
         
     if timeout == 0:
-        ret = child.wait()
+        try:
+            ret = child.wait()
+        except (SystemExit, KeyboardInterrupt):
+            raise InhibitorError(
+                "Caught SystemExit or KeyboardInterrupt while running %s"
+                % (cmdline))
     else:
         start_time = time.time()
         ctime = start_time
