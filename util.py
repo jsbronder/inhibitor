@@ -124,7 +124,7 @@ def umount(mp, mounts):
                 pl.append( root[len('/proc/'):-len('/root')] )
         _kill_pids(pl)
 
-        if cmd('umount %s' % fp, raise_exception=False) != 0:
+        if cmd('umount -f %s' % fp, raise_exception=False) != 0:
             err('Cound not unmount %s' % fp)
             return False
     if mp.rmdir:
