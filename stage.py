@@ -43,6 +43,7 @@ class BaseStage(actions.InhibitorAction):
         self.istate         = None
         self.target_root    = None
         self.profile        = None
+        self.seed           = None
         self.aux_mounts     = {}
         self.aux_sources    = {}
 
@@ -60,6 +61,12 @@ class BaseStage(actions.InhibitorAction):
 
         if self.conf.has('overlays'):
             self.env['PORTDIR_OVERLAY'] = ''
+
+        if self.conf.has('seed'):
+            self.seed = self.conf.seed
+        else:
+            raise InhibitorError('No seed stage specified')
+
         super(BaseStage, self).__init__(self.build_name, **keywds)
 
     def update_root(self, new_root):
@@ -76,8 +83,10 @@ class BaseStage(actions.InhibitorAction):
     def post_conf(self, inhibitor_state):
         super(BaseStage, self).post_conf(inhibitor_state)
 
-        self.target_root = self.istate.paths.build.pjoin(self.build_name)
+        self.target_root    = self.istate.paths.build.pjoin(self.build_name)
         util.mkdir(self.target_root)
+        if self.seed:
+            self.seed       = self.istate.paths.stages.pjoin(self.seed)
 
         self.aux_mounts = {
             'proc': util.Mount('/proc', '/proc', self.target_root),
@@ -162,6 +171,23 @@ class BaseStage(actions.InhibitorAction):
             src.post_conf( self.istate )
             src.init()
 
+    def unpack_seed(self):
+        if not os.path.isdir(self.seed):
+            if os.path.exists(self.seed):
+                os.unlink(self.seed)
+            seedfile = self.seed + '.tar.bz2'
+            util.info("Unpacking %s" % seedfile)
+            os.makedirs(self.seed)
+            try:
+                util.cmd('tar -xjpf %s -C %s/' % (seedfile, self.seed))
+            except:
+                shutil.rmtree(self.seed)
+                raise
+
+        util.info("Syncing %s to %s" % (self.seed.dname(), self.target_root.dname()) )
+        util.cmd('rsync -a --delete %s %s' %
+            (self.seed.dname(), self.target_root.dname()) )
+
     def install_sources(self):
         for src in self.sources:
             src.install( root = self.target_root )
@@ -170,7 +196,6 @@ class BaseStage(actions.InhibitorAction):
         # XXX:  We also need to make the root profile link, Gentoo Bug 324179.
         for dir in (self.target_root, self.target_root.pjoin(self.portage_cr)):
             targ = dir.pjoin('/etc/make.profile')
-            print targ
             util.mkdir( os.path.dirname(targ) )
             if os.path.lexists(targ):
                 os.unlink(targ)
@@ -212,16 +237,10 @@ class Stage4(BaseStage):
         self.package_list   = []
         self.scripts        = []
         self.tarpath        = None
-        self.seed           = None
         self.kernel         = None
 
         super(Stage4, self).__init__(stage_conf, build_name, 'stage4', **keywds)
         self.emerge_cmd     = '%s/inhibitor-run.sh run_emerge ' % (self.env['INHIBITOR_SCRIPT_ROOT'],)
-
-        if self.conf.has('seed'):
-            self.seed = self.conf.seed
-        else:
-            raise InhibitorError('No seed stage specified')
 
     def post_conf(self, inhibitor_state):
         kerncache = source.create_source(
@@ -232,7 +251,6 @@ class Stage4(BaseStage):
         self.sources.append(kerncache)
 
         super(Stage4, self).post_conf(inhibitor_state)
-        self.seed       = self.istate.paths.stages.pjoin(self.seed)
         self.tarpath    = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
         
         if self.conf.has('scripts'):
@@ -289,23 +307,6 @@ class Stage4(BaseStage):
         ret.append( util.Step(self.clean_tmp,               always=True)    )
         ret.append( util.Step(self.pack,                    always=False)   )
         return ret
-
-    def unpack_seed(self):
-        if not os.path.isdir(self.seed):
-            if os.path.exists(self.seed):
-                os.unlink(self.seed)
-            seedfile = self.seed + '.tar.bz2'
-            util.info("Unpacking %s" % seedfile)
-            os.makedirs(self.seed)
-            try:
-                util.cmd('tar -xjpf %s -C %s/' % (seedfile, self.seed))
-            except:
-                shutil.rmtree(self.seed)
-                raise
-
-        util.info("Syncing %s to %s" % (self.seed.dname(), self.target_root.dname()) )
-        util.cmd('rsync -a --delete %s %s' %
-            (self.seed.dname(), self.target_root.dname()) )
 
     def merge_preperation(self):
         for m in ('proc', 'sys', 'dev'):
