@@ -393,6 +393,9 @@ def path_sync(src, targ, root='/', ignore=lambda x, y: [], file_copy_callback=No
     else:
         if not os.path.lexists( os.path.dirname(os.path.realpath(targ)) ):
             os.makedirs( os.path.dirname(os.path.realpath(targ)) )
+        if os.path.islink(targ):
+            # shutil.copy2 follows links for the dest path.
+            os.unlink(targ)
         shutil.copy2(src, targ)
         if file_copy_callback != None:
             file_copy_callback(src, targ)
