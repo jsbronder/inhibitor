@@ -44,6 +44,7 @@ class BaseStage(actions.InhibitorAction):
         self.target_root    = None
         self.profile        = None
         self.seed           = None
+        self.kernel         = None
         self.aux_mounts     = {}
         self.aux_sources    = {}
 
@@ -65,7 +66,7 @@ class BaseStage(actions.InhibitorAction):
         if self.conf.has('seed'):
             self.seed = self.conf.seed
         else:
-            raise InhibitorError('No seed stage specified')
+            raise util.InhibitorError('No seed stage specified')
 
         super(BaseStage, self).__init__(self.build_name, **keywds)
 
@@ -114,6 +115,25 @@ class BaseStage(actions.InhibitorAction):
             dest = self.env['DISTDIR']
         )
         self.sources.append(distcache)
+
+        if self.conf.has('kernel'):
+            self.kernel = self.conf.kernel
+            if not self.kernel.has('kconfig'):
+                raise util.InhibitorError('No kernel config (kconfig) specified.')
+            else:
+                self.kernel.kconfig.keep = False
+                self.kernel.kconfig.dest = util.Path('/tmp/inhibitor/kconfig')
+                self.kernel.kconfig.post_conf(inhibitor_state)
+                self.sources.append(self.kernel.kconfig)
+            if not self.kernel.has('kernel_pkg'):
+                raise util.InhibitorError('No kernel package (kernel_pkg) specified.')
+
+            kerncache = source.create_source(
+                "file://%s" % util.mkdir(inhibitor_state.paths.kernel.pjoin(self.build_name)),
+                keep = False,
+                dest = '/tmp/inhibitor/kerncache'
+            )
+            self.sources.append(kerncache)
 
         if self.conf.has('snapshot'):
             self.conf.snapshot.keep = False
@@ -237,19 +257,11 @@ class Stage4(BaseStage):
         self.package_list   = []
         self.scripts        = []
         self.tarpath        = None
-        self.kernel         = None
 
         super(Stage4, self).__init__(stage_conf, build_name, 'stage4', **keywds)
         self.emerge_cmd     = '%s/inhibitor-run.sh run_emerge ' % (self.env['INHIBITOR_SCRIPT_ROOT'],)
 
     def post_conf(self, inhibitor_state):
-        kerncache = source.create_source(
-            "file://%s" % util.mkdir(inhibitor_state.paths.kernel.pjoin(self.build_name)),
-            keep = False,
-            dest = '/tmp/inhibitor/kerncache'
-        )
-        self.sources.append(kerncache)
-
         super(Stage4, self).post_conf(inhibitor_state)
         self.tarpath    = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
         
@@ -263,18 +275,6 @@ class Stage4(BaseStage):
         else:
             raise util.InhibitorError('No packages specified')
         
-        if self.conf.has('kernel'):
-            self.kernel = self.conf.kernel
-            if not self.kernel.has('kconfig'):
-                raise util.InhibitorError('No kernel config (kconfig) specified.')
-            else:
-                self.kernel.kconfig.keep = False
-                self.kernel.kconfig.dest = util.Path('/tmp/inhibitor/kconfig')
-                self.kernel.kconfig.post_conf(inhibitor_state)
-                self.sources.append(self.kernel.kconfig)
-            if not self.kernel.has('kernel_pkg'):
-                raise util.InhibitorError('No kernel package (kernel_pkg) specified.')
-
     def _emerge(self, packages, flags=''):
         util.chroot(
             path = self.target_root,
