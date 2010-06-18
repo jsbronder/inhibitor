@@ -11,6 +11,7 @@ import source
 
 class EmbeddedStage(stage.BaseStage):
     def __init__(self, stage_conf, build_name, **keywds):
+        self.seed           = None
         self.tarpath        = None
         self.cpiopath       = None
         self.fs_add         = None
@@ -30,6 +31,9 @@ class EmbeddedStage(stage.BaseStage):
 
     
     def post_conf(self, inhibitor_state):
+        if self.conf.has('seed'):
+            self.seed = self.conf.seed
+
         if self.conf.has('fs_add'):
             self.conf.fs_add.keep = True
             self.conf.fs_add.dest = util.Path('/')
@@ -78,6 +82,8 @@ class EmbeddedStage(stage.BaseStage):
 
     def get_action_sequence(self):
         ret = []
+        if self.seed:
+            ret.append( util.Step(self.unpack_seed,             always=False)   )
         ret.append( util.Step(self.install_sources,             always=True)    )
         ret.append( util.Step(self.make_profile_link,           always=False)   )
         ret.append( util.Step(self.merge_packages,              always=False)   )
@@ -91,37 +97,55 @@ class EmbeddedStage(stage.BaseStage):
         ret.append( util.Step(self.update_init,                 always=False)   )
         ret.append( util.Step(self.remove_sources,              always=False)   )
         ret.append( util.Step(self.pack,                        always=False)   )
-        ret.append( util.Step(self.clean_sources,               always=False)   )
+        ret.append( util.Step(self.finish_sources,              always=False)   )
         ret.append( util.Step(self.final_report,                always=True)    )
         return ret
 
-    def make_profile_link(self):
-        targ = self.portage_cr.pjoin('/etc/make.profile')
-        util.mkdir( os.path.dirname(targ) )
-        if os.path.lexists(targ):
-            os.unlink(targ)
-        os.symlink(self.env['PORTDIR'] + '/profiles/%s' % self.profile, targ)
-
-    def merge_packages(self): 
-        util.cmd(
-            '%s/inhibitor-run.sh run_emerge --newuse %s'
-                % (self.env['INHIBITOR_SCRIPT_ROOT'], ' '.join(self.package_list)),
-            env = self.env
-        )
-
     def install_sources(self):
-        for src in self.sources:
-            src.install( root = util.Path('/') )
+        emb_root    = self.target_root
+        libpath     = util.Path('/lib')
+        if self.seed:
+            super(EmbeddedStage, self).install_sources()
+            emb_root = emb_root.pjoin(self.target_root)
+            libpath = self.target_root.pjoin(libpath)
+        else:
+            for src in self.sources:
+                src.install( root = util.Path('/') )
+
         for src in self.stage_sources:
-            src.install( root = self.target_root )
-        libpath = '/lib'
-        target = self.target_root.pjoin(libpath)
+            src.install( root = emb_root )
+            
+        target = emb_root.pjoin('/lib')
         if os.path.lexists( target ):
             os.unlink( target )
         if os.path.islink( libpath ):
             os.symlink(os.readlink(libpath), target)
-            util.mkdir( self.target_root.pjoin( os.path.realpath(libpath) ) )
-    
+            util.mkdir( emb_root.pjoin( os.readlink(libpath) ) )
+
+    def make_profile_link(self):
+        if self.seed:
+            super(EmbeddedStage, self).make_profile_link()
+        else:
+            targ = self.portage_cr.pjoin('/etc/make.profile')
+            util.mkdir( os.path.dirname(targ) )
+            if os.path.lexists(targ):
+                os.unlink(targ)
+            os.symlink(self.env['PORTDIR'] + '/profiles/%s' % self.profile, targ)
+
+    def merge_packages(self):
+        cmdline = '%s/inhibitor-run.sh run_emerge --newuse %s' % (
+            self.env['INHIBITOR_SCRIPT_ROOT'], ' '.join(self.package_list))
+
+        if self.seed:
+            util.chroot(
+                path        = self.target_root,
+                function    = util.cmd,
+                fargs       = {'cmdline':cmdline, 'env':self.env},
+                failuref    = self.chroot_failure
+            )
+        else:
+            util.cmd( cmdline, env = self.env )
+
     def target_merge_busybox(self):
         env = {}
         use = ''
@@ -134,32 +158,55 @@ class EmbeddedStage(stage.BaseStage):
         env.update(self.env)
         env['USE'] = use 
         env['ROOT'] = self.target_root
-       
-        util.cmd(
-            '%s/inhibitor-run.sh run_emerge --newuse --nodeps sys-apps/busybox'
-                % self.env['INHIBITOR_SCRIPT_ROOT'],
-            env = env
-        )
+
+        cmdline = '%s/inhibitor-run.sh run_emerge --newuse --nodeps sys-apps/busybox' \
+                % self.env['INHIBITOR_SCRIPT_ROOT']
+      
+        if self.seed:
+            util.chroot(
+                path        = self.target_root,
+                function    = util.cmd,
+                fargs       = {'cmdline':cmdline, 'env':env},
+                failuref    = self.chroot_failure
+            )
+            util.chroot(
+                path        = self.target_root,
+                function    = self.path_sync_callback,
+                fargs       = {'src':'/bin/busybox', '_':None},
+                failuref    = self.chroot_failure
+            )
+ 
+        else:
+            util.cmd( cmdline, env = env )
+            self.path_sync_callback('/bin/busybox', None)
 
     def target_merge_packages(self):
         env = {}
         env.update(self.env)
         env['ROOT'] = self.target_root
-        util.cmd(
-            '%s/inhibitor-run.sh run_emerge --newuse --nodeps %s'
-                % (self.env['INHIBITOR_SCRIPT_ROOT'], ' '.join(self.package_list)),
-            env = env
-        )
+
+        cmdline =  '%s/inhibitor-run.sh run_emerge --newuse --nodeps %s' % (
+                self.env['INHIBITOR_SCRIPT_ROOT'], ' '.join(self.package_list))
+
+        if self.seed:
+            util.chroot(
+                path        = self.target_root,
+                function    = util.cmd,
+                fargs       = {'cmdline':cmdline, 'env':env},
+                failuref    = self.chroot_failure
+            )
+        else:
+            util.cmd( cmdline, env = env )
 
     def _ldlibs(self, binp):
         if binp in self.checked_ldd:
             return []
         self.checked_ldd.append(binp)
+            
+        cmdline = 'ldd %s' % (binp,)
 
-        rc, output = util.cmd_out(
-            cmdline         = 'ldd %s' % (binp,),
-            raise_exception =   False,
-        )
+        rc, output = util.cmd_out( cmdline, raise_exception=False)
+
         if rc != 0:
             return []
         libs = []
@@ -180,8 +227,10 @@ class EmbeddedStage(stage.BaseStage):
         except AttributeError:
             return 
         if not mime_type in ('application/x-executable', 'application/x-sharedlib'):
-            return 
+            return
+
         needed_libs = self._ldlibs(src)
+
         for needed_lib in needed_libs:
             util.path_sync(
                 needed_lib,
@@ -192,47 +241,79 @@ class EmbeddedStage(stage.BaseStage):
     def copy_files(self):
         for min_path in self.files:
             if '*' in min_path:
-                files = glob.glob(min_path)
+                files = glob.glob( min_path )
             else:
                 files = [ min_path ]
 
+            print files
             for path in files:
-                if not os.path.lexists(path):
-                    util.warn('Path %s does not exist' % (min_path,))
-                    continue
-                util.path_sync(
-                    path,
-                    self.target_root.pjoin(path),
-                    file_copy_callback = self.path_sync_callback
-         )
+                if self.seed:
+                    if not os.path.lexists(self.target_root.pjoin(path)):
+                        util.warn('Path %s does not exist' % (min_path,))
+                        continue
+                    util.chroot(
+                        path        = self.target_root,
+                        function    = util.path_sync,
+                        fargs       = {
+                            'src':                  path,
+                            'targ':                 self.target_root.pjoin(path),
+                            'file_copy_callback':   self.path_sync_callback
+                        },
+                        failuref    = self.chroot_failure
+                    )
+                else:
+                    if not os.path.lexists(path):
+                        util.warn('Path %s does not exist' % (min_path,))
+                        continue
+                    util.path_sync(
+                        path,
+                        self.target_root.pjoin(path),
+                        file_copy_callback = self.path_sync_callback
+                    )
 
     def copy_libs(self):
         for root, _, files in os.walk(self.target_root):
             for f in files:
-                root_path = os.path.join( root.replace(self.target_root, ''), f )
-                self.path_sync_callback( root_path, None )
+                src_path = os.path.join( root.replace(self.target_root, ''), f )
+                if self.seed:
+                    util.chroot(
+                        path        = self.target_root,
+                        function    = self.path_sync_callback,
+                        fargs       = {'src':src_path, '_':None},
+                        failuref    = self.chroot_failure
+                    )
+                else:
+                    self.path_sync_callback( src_path, None )
 
     def install_modules(self):
+        emb_root = self.target_root
+        if self.seed:
+            emb_root = emb_root.pjoin(self.target_root)
+
         for m in self.modules:
             init = self.moduledir.pjoin('%s.init' % m)
             conf = self.moduledir.pjoin('%s.conf' % m)
             if os.path.exists(init):
-                shutil.copy2(init, self.target_root.pjoin('etc/init.d/%s' % m))
+                shutil.copy2(init, emb_root.pjoin('etc/init.d/%s' % m))
             if os.path.exists(conf):
-                shutil.copy2(conf, self.target_root.pjoin('etc/conf.d/%s' % m))
+                shutil.copy2(conf, emb_root.pjoin('etc/conf.d/%s' % m))
 
     def update_init(self):
-        for initd in glob.iglob('%s/*' % self.target_root.pjoin('etc/init.d')):
-            int_path = initd.replace(self.target_root, '')
+        emb_root = self.target_root
+        if self.seed:
+            emb_root = emb_root.pjoin(self.target_root)
+
+        for initd in glob.iglob('%s/*' % emb_root.pjoin('etc/init.d')):
+            int_path = initd.replace(emb_root, '')
             util.dbg('Adding %s to init' % int_path)
             util.chroot(
-                path = self.target_root,
-                function = util.cmd,
-                fargs = {
+                path        = emb_root,
+                function    = util.cmd,
+                fargs       = {
                     'cmdline':  '%s enable' % int_path,
                     'shell':    '/bin/ash'
                 },
-                failuref = self.chroot_failure,
+                failuref    = self.chroot_failure,
             )
 
     def remove_sources(self):
@@ -241,23 +322,27 @@ class EmbeddedStage(stage.BaseStage):
             src.remove()
 
     def pack(self):
+        emb_root = self.target_root
+        if self.seed:
+            emb_root = emb_root.pjoin(self.target_root)
+
         basedir = os.path.dirname(self.tarpath)
         util.mkdir(basedir)
 
         archive = tarfile.open(self.tarpath, 'w:bz2')
-        archive.add(self.target_root,
+        archive.add(emb_root,
             arcname = '/',
             recursive = True
         )
         archive.close()
 
         curdir = os.path.realpath(os.curdir)
-        os.chdir(self.target_root)
+        os.chdir(emb_root)
         util.cmd('find ./ | cpio -H newc -o | gzip -c -9 > %s' % (self.cpiopath))
         os.chdir(curdir)
 
-    def clean_sources(self):
-        super(EmbeddedStage, self).clean_sources()
+    def finish_sources(self):
+        super(EmbeddedStage, self).finish_sources()
         for src in self.stage_sources:
             src.finish()
 
@@ -266,3 +351,4 @@ class EmbeddedStage(stage.BaseStage):
         util.info("Created %s" % (self.cpiopath,))
         if self.conf.has('kernel'):
             util.info("Kernel copied into %s" % (os.path.dirname(self.tarpath),) )
+
