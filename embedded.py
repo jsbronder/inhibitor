@@ -95,6 +95,8 @@ class EmbeddedStage(stage.BaseStage):
             ret.append( util.Step(self.copy_files,              always=False)   )
         ret.append( util.Step(self.install_modules,             always=False)   )
         ret.append( util.Step(self.update_init,                 always=False)   )
+        if self.kernel:
+            ret.append( util.Step(self.merge_kernel,            always=False)   )
         ret.append( util.Step(self.remove_sources,              always=False)   )
         ret.append( util.Step(self.pack,                        always=False)   )
         ret.append( util.Step(self.finish_sources,              always=False)   )
@@ -316,6 +318,29 @@ class EmbeddedStage(stage.BaseStage):
                 failuref    = self.chroot_failure,
             )
 
+    def merge_kernel(self):
+        args = ['--build_name', self.build_name,
+            '--kernel_pkg', self.kernel.kernel_pkg]
+
+        cmdline = '%s/kernel.sh %s' % (
+            self.env['INHIBITOR_SCRIPT_ROOT'],
+            ' '.join(args) )
+
+        env = {}
+        env.update(self.env)
+        env['ROOT'] = '/tmp/inhibitor/kernelbuild'
+
+        if self.seed:
+            util.mkdir( self.target_root.pjoin(env['ROOT']) )
+            util.chroot(
+                path        = self.target_root,
+                function    = util.cmd,
+                fargs       = {'cmdline':cmdline, 'env':env},
+                failuref    = self.chroot_failure,
+            )
+        else:
+            util.cmd( cmdline, env )
+
     def remove_sources(self):
         super(EmbeddedStage, self).remove_sources()
         for src in self.stage_sources:
@@ -326,7 +351,7 @@ class EmbeddedStage(stage.BaseStage):
         if self.seed:
             emb_root = emb_root.pjoin(self.target_root)
 
-        basedir = os.path.dirname(self.tarpath)
+        basedir = util.Path( os.path.dirname(self.tarpath) )
         util.mkdir(basedir)
 
         archive = tarfile.open(self.tarpath, 'w:bz2')
@@ -340,6 +365,21 @@ class EmbeddedStage(stage.BaseStage):
         os.chdir(emb_root)
         util.cmd('find ./ | cpio -H newc -o | gzip -c -9 > %s' % (self.cpiopath))
         os.chdir(curdir)
+
+        if self.kernel:
+            r = util.Path('/')
+            if self.seed:
+                r = self.target_root
+            r = r.pjoin('/tmp/inhibitor/kernelbuild')
+
+            kernel_link = r.pjoin('/boot/kernel')
+            kernel_path = os.path.realpath( kernel_link )
+            
+            if os.path.lexists( basedir.pjoin('kernel') ):
+                os.unlink(basedir.pjoin('kernel'))
+
+            shutil.copy2(kernel_path, basedir.pjoin( os.path.basename(kernel_path) ))
+            os.symlink(os.path.basename(kernel_path), basedir.pjoin('kernel'))
 
     def finish_sources(self):
         super(EmbeddedStage, self).finish_sources()
