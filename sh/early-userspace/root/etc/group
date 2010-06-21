@@ -1,0 +1,9 @@
+root:x:0:root
+tty:x:1:root
+uucp:x:2:root
+disk:x:3:root
+cdrom:x:4:root
+floppy:x:5:root
+audio:x:6:root
+dialout:x:7:root
+video:x:8:root
