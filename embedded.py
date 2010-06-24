@@ -98,6 +98,7 @@ class EmbeddedStage(stage.BaseStage):
         if self.kernel:
             ret.append( util.Step(self.merge_kernel,            always=False)   )
         ret.append( util.Step(self.remove_sources,              always=False)   )
+        ret.append( util.Step(self.clean_root,                  always=True)    )
         ret.append( util.Step(self.pack,                        always=False)   )
         ret.append( util.Step(self.finish_sources,              always=False)   )
         ret.append( util.Step(self.final_report,                always=True)    )
@@ -345,6 +346,23 @@ class EmbeddedStage(stage.BaseStage):
         super(EmbeddedStage, self).remove_sources()
         for src in self.stage_sources:
             src.remove()
+
+    def clean_root(self):
+        emb_root = self.target_root
+        if self.seed:
+            emb_root = emb_root.pjoin(self.target_root)
+        rm_dirs = [
+            '/var/cache/edb',   # Portage
+            '/var/lib/portage', # Portage
+            '/var/db/pkg',      # Portage
+            '/usr/share',       # Busybox emerge.
+            '/etc/portage',     # Busybox emerge.
+            '/lib/rcscripts',   # Busybox emerge
+        ]
+        
+        for dir in rm_dirs:
+            if os.path.isdir( emb_root.pjoin(dir) ):
+                shutil.rmtree( emb_root.pjoin(dir) )
 
     def pack(self):
         emb_root = self.target_root
