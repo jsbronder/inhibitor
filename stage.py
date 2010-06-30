@@ -292,10 +292,10 @@ class Stage4(BaseStage):
 
     def get_action_sequence(self):
         ret = []
-        ret.append( util.Step(self.unpack_seed,             always=False)    )
+        ret.append( util.Step(self.unpack_seed,             always=False)   )
         ret.append( util.Step(self.install_sources,         always=True)    )
         ret.append( util.Step(self.make_profile_link,       always=False)   )
-        ret.append( util.Step(self.merge_preperation,       always=True)   )
+        ret.append( util.Step(self.merge_preperation,       always=True)    )
         ret.append( util.Step(self.merge_portage,           always=False)   )
         ret.append( util.Step(self.merge_system,            always=False)   )
         ret.append( util.Step(self.merge_packages,          always=False)   )
@@ -303,7 +303,8 @@ class Stage4(BaseStage):
         ret.append( util.Step(self.run_scripts,             always=False)   )
         ret.append( util.Step(self.remove_sources,          always=True)    )
         ret.append( util.Step(self.finish_sources,          always=True)    )
-        ret.append( util.Step(self.restore_profile_link,    always=False)   )
+        ret.append( util.Step(self.install_portage_conf,    always=False)   )
+        ret.append( util.Step(self.restore_profile_link,    always=True)    )
         ret.append( util.Step(self.clean_tmp,               always=True)    )
         ret.append( util.Step(self.pack,                    always=False)   )
         return ret
@@ -373,12 +374,16 @@ class Stage4(BaseStage):
         for m in ('resolv.conf', 'hosts'):
             self.aux_sources[m].finish()
 
+    def install_portage_conf(self):
+        portage_cr = self.target_root.pjoin( self.env['PORTAGE_CONFIGROOT'] + '/etc/' )
+        dest = self.target_root.pjoin('/etc/')
+        util.path_sync(portage_cr, dest)
 
     def pack(self):
         archive = tarfile.open(self.tarpath, 'w:bz2')
         archive.add(self.target_root,
             arcname = '/',
-            recursive = True
+            recursive = True,
         )
         archive.close()
         util.info("Created %s" % (self.tarpath,))
