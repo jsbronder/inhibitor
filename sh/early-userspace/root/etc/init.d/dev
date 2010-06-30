@@ -2,6 +2,7 @@
 START=01
 
 start () {
+    mount -t tmpfs tmpfs /dev
     # Pre-seed /dev
     [ -c /dev/console   ] || mknod -m 600 /dev/console  c 5 1
     [ -c /dev/null      ] || mknod -m 666 /dev/null     c 1 3
