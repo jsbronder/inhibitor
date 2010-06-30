@@ -2,17 +2,8 @@
 
 START=30
 
-need_run () {
-    source /etc/kcmdline.conf
-    
-    [ -n "${ROOTDEV##/dev/md*}" ] \
-        || [ ${MDADM} -ne 0 ] \
-        || [ -s /etc/mdadm.conf ]
-}
-
 start () {
     local md_dev
-    need_run || return 0
 
     if [ ! -s /etc/mdadm.conf -o -z "$(grep -v '^#' /etc/mdadm.conf 2>/dev/null)" ]; then
         /sbin/mdadm --examine --scan > /etc/mdadm.conf
