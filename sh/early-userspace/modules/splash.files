@@ -1,4 +1,5 @@
 /sbin/splash_helper
 /sbin/fbcondecor_helper
+/sbin/splash-functions.sh
 /etc/splash/luxisri.ttf
 /lib/splash
