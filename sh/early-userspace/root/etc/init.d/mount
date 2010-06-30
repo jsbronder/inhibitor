@@ -2,6 +2,8 @@
 START=02
 
 start () {
+    touch /etc/fstab
+
     if awk '/^rootfs/{print $4}' /proc/mounts  | grep ',\?ro,\?' >/dev/null; then
         mount -n -o remount,rw / || die "Failed to remount / rw"
     fi
