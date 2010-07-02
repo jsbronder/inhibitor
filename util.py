@@ -5,7 +5,6 @@ import tempfile
 import os.path
 import shutil
 import glob
-import traceback
 import signal
 import time
 
@@ -18,7 +17,7 @@ except ImportError:
 INHIBITOR_DEBUG = False
 
 class InhibitorError(Exception):
-    def __init__(self, message, **keywds):
+    def __init__(self, message):
         super(InhibitorError, self).__init__(message)
         print
         print
@@ -368,7 +367,7 @@ def path_sync(src, targ, root='/', ignore=lambda x, y: [], file_copy_callback=No
             # root filesystem, links that start with / cannot be trusted, so we
             # have to backtrack from the src path to what / actually is.
             append = ''
-            for i in range(0, src.count('/')-root.count('/')):
+            for _ in range(0, src.count('/')-root.count('/')):
                 append = os.path.join(append, '..')
 
             link = link.lstrip('/')

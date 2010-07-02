@@ -361,9 +361,9 @@ class EmbeddedStage(stage.BaseStage):
             '/lib/rcscripts',   # Busybox emerge
         ]
         
-        for dir in rm_dirs:
-            if os.path.isdir( emb_root.pjoin(dir) ):
-                shutil.rmtree( emb_root.pjoin(dir) )
+        for d in rm_dirs:
+            if os.path.isdir( emb_root.pjoin(d) ):
+                shutil.rmtree( emb_root.pjoin(d) )
 
     def pack(self):
         emb_root = self.target_root

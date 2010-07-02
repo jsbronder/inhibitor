@@ -140,7 +140,7 @@ class BaseStage(actions.InhibitorAction):
             self.conf.snapshot.dest = util.Path( self.env['PORTDIR'] )
             self.sources.append(self.conf.snapshot)
         else:
-            rc, portdir = util.cmd_out('portageq portdir', raise_exception=True)
+            _, portdir = util.cmd_out('portageq portdir', raise_exception=True)
             self.sources.append( 
                 source.create_source( 'file://' + portdir,
                     keep = False,
@@ -214,8 +214,8 @@ class BaseStage(actions.InhibitorAction):
 
     def make_profile_link(self):
         # XXX:  We also need to make the root profile link, Gentoo Bug 324179.
-        for dir in (self.target_root, self.target_root.pjoin(self.portage_cr)):
-            targ = dir.pjoin('/etc/make.profile')
+        for d in (self.target_root, self.target_root.pjoin(self.portage_cr)):
+            targ = d.pjoin('/etc/make.profile')
             util.mkdir( os.path.dirname(targ) )
             if os.path.lexists(targ):
                 os.unlink(targ)
