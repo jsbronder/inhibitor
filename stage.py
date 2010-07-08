@@ -45,6 +45,7 @@ class BaseStage(actions.InhibitorAction):
         self.profile        = None
         self.seed           = None
         self.kernel         = None
+        self.pkgcache       = None
         self.aux_mounts     = {}
         self.aux_sources    = {}
 
@@ -67,6 +68,9 @@ class BaseStage(actions.InhibitorAction):
             self.seed = self.conf.seed
         else:
             raise util.InhibitorError('No seed stage specified')
+
+        if self.conf.has('pkgcache'):
+            self.pkgcache = self.conf.pkgcache
 
         super(BaseStage, self).__init__(self.build_name, **keywds)
 
@@ -101,13 +105,12 @@ class BaseStage(actions.InhibitorAction):
                     'file://etc/hosts', keep = True, dest = '/etc/hosts'),
         }
                     
-
-        pkgcache = source.create_source(
-            "file://%s" % util.mkdir(self.istate.paths.pkgs.pjoin(self.build_name)),
-            keep = False,
-            dest = self.env['PKGDIR']
-        )
-        self.sources.append(pkgcache)
+        if not self.pkgcache:
+            self.pkgcache = source.create_source(
+                "file://%s" % util.mkdir(self.istate.paths.pkgs.pjoin(self.build_name)) )
+        self.pkgcache.keep = False
+        self.pkgcache.dest = self.env['PKGDIR']
+        self.sources.append(self.pkgcache)
 
         distcache = source.create_source(
             "file://%s" % util.mkdir(self.istate.paths.dist),
