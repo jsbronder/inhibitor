@@ -133,8 +133,11 @@ cached() {
 init() {
     _init
     einfo "Preparing to build and install the kernel"
-    local kpkg=$(portageq best_visible / ${KERNEL_PKG})
-    local vers="$(printf "%s\n%s\n%s\n" \
+    local kpkg vers
+    
+    kpkg=$(portageq best_visible / "${KERNEL_PKG}")
+    [ ${?} -eq 0 -a -n "${kpkg}" ] || die "Failed to resolve best_visible ${KERNEL_PKG}"
+    vers="$(printf "%s\n%s\n%s\n" \
             "import portage" \
             "a = portage.catpkgsplit('${kpkg}')" \
             "print a[1], a[2], a[3]" | python )"

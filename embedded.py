@@ -322,7 +322,7 @@ class EmbeddedStage(stage.BaseStage):
 
     def merge_kernel(self):
         args = ['--build_name', self.build_name,
-            '--kernel_pkg', self.kernel.kernel_pkg]
+            '--kernel_pkg', '\'%s\'' % (self.kernel.kernel_pkg,)]
 
         cmdline = '%s/kernel.sh %s' % (
             self.env['INHIBITOR_SCRIPT_ROOT'],

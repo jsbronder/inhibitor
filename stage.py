@@ -331,7 +331,7 @@ class Stage4(BaseStage):
 
     def merge_kernel(self):
         args = ['--build_name', self.build_name,
-            '--kernel_pkg', self.kernel.kernel_pkg]
+            '--kernel_pkg', '\'%s\'' % (self.kernel.kernel_pkg,)]
 
         if self.kernel.has('genkernel'):
             args.extend(['--genkernel', self.kernel.genkernel])
