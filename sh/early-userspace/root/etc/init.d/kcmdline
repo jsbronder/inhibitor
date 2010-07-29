@@ -27,8 +27,6 @@ start () {
                 INSTALLER_ARCH=${cmd#*:};;
             hw_rev:*)
                 INSTALLER_HW_REV=${cmd#*:};;
-            *)
-                extras="${extras} $(echo ${cmd%%:*} | tr [a-z] [A-Z])=\"${cmd#*:}\"";;
         esac
     done
 
@@ -44,8 +42,5 @@ NSTALLER_ARCH="${INSTALLER_ARCH}"
 NSTALLER_HW_REV="${INSTALLER_HW_REV}"
 EOF
 
-    for cmd in ${extras}; do
-        echo "${cmd}" >> /etc/kcmdline.conf
-    done
 }
 
