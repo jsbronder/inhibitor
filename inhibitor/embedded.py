@@ -40,7 +40,7 @@ class EmbeddedStage(stage.BaseStage):
             self.stage_sources.append(self.conf.fs_add)
 
         baselayout     = source.create_source(
-            src = 'file://%s/sh/early-userspace/root' % inhibitor_state.paths.share,
+            src = 'file://%s/early-userspace/root' % inhibitor_state.paths.share,
             keep = True,
             dest = util.Path('/')
         )
@@ -51,7 +51,7 @@ class EmbeddedStage(stage.BaseStage):
             src.init()
 
         super(EmbeddedStage, self).post_conf(inhibitor_state)
-        self.moduledir      = self.istate.paths.share.pjoin('sh/early-userspace/modules')
+        self.moduledir      = self.istate.paths.share.pjoin('early-userspace/modules')
         self.tarpath        = self.istate.paths.stages.pjoin('%s/image.tar.bz2' % (self.build_name,))
         self.cpiopath       = self.istate.paths.stages.pjoin('%s/initramfs.gz' % (self.build_name,))
 

@@ -159,7 +159,7 @@ class BaseStage(actions.InhibitorAction):
                 self.env['PORTDIR_OVERLAY'] += ' /tmp/inhibitor/overlays/%d' % i
                 i += 1
 
-        for i in glob.iglob( self.istate.paths.share.pjoin('sh/*.sh') ):
+        for i in glob.iglob( self.istate.paths.share.pjoin('*.sh') ):
             j = source.create_source(
                     "file://%s" % i,
                     keep = False,
