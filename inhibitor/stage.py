@@ -302,7 +302,8 @@ class Stage4(BaseStage):
         ret.append( util.Step(self.merge_portage,           always=False)   )
         ret.append( util.Step(self.merge_system,            always=False)   )
         ret.append( util.Step(self.merge_packages,          always=False)   )
-        ret.append( util.Step(self.merge_kernel,            always=False)   )
+        if self.kernel:
+            ret.append( util.Step(self.merge_kernel,        always=False)   )
         ret.append( util.Step(self.run_scripts,             always=False)   )
         ret.append( util.Step(self.remove_sources,          always=True)    )
         ret.append( util.Step(self.finish_sources,          always=True)    )
