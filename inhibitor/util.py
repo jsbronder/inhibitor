@@ -147,16 +147,18 @@ def _kill_pids(pids, ignore_exceptions=True):
 
     for p in pids:
         p = int(p)
-        if p == -1:
+        if p == -1 or not os.path.isdir('/proc/%d' %p):
             continue
         try:
             os.kill(p, signal.SIGTERM)
+            time.sleep(0.1)
             if os.waitpid(p, os.WNOHANG)[1] == 0:
                 os.kill(p, signal.SIGKILL)
                 os.waitpid(p, 0)
         except OSError, e:
-            if ignore_exceptions:
-                warn('Child process %d already exited or failed to die' % (p,))
+            if os.path.isdir('/proc/%d') and ignore_exceptions:
+                warn('Failed to kill %d' % (p,))
+                pass
             if not e.errno in (10, 3):
                 raise e
     
