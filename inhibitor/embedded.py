@@ -10,6 +10,39 @@ import util
 import source
 
 class EmbeddedStage(stage.BaseStage):
+    """
+    Create an Embedded Stage, essentially a stage4 based on busybox providing the majority
+    of the required functionality.
+
+    @param stage_conf   - Stage configuration, details below.
+    @param build_name   - Unique string to identify the stage.
+
+    Stage Configuration:
+    @param name         - Should match the build_name.
+    @param snapshot     - InhibitorSource representing the portage tree.
+    @param overlays     - List of InhibitorSources' to use as portage overlays.
+    @param kernel       - Container for kernel configuration.
+        kernel_pkg      - String passed to emerge to get kernel package.
+        kconfig         - InhibitorSource that contains the kernel config.
+        genkernel       - Arguments to pass to genkernel when building the
+                          initramfs.
+        packages        - List of packages that should be installed after the
+                          kernel has been configured.
+    @param profile      - Portage profile to use.
+    @param seed         - Name of the seed stage to use for building.  Stage
+                          needs to be located in inhibitor's stagedir.
+    @param package_list - String or List of packages to install to
+                          the working stage3.
+    @param make_conf    - InhibitorSource for make.conf.
+    @param fs_add       - InhibitorSource of files to add to the completed stage.
+    @param files        - String or List of files that should be copied from the
+                          working stage3 into the embedded stage.
+    @param portage_conf - InhibitorSource with the contents for /etc/portage.
+    @param modules      - Modules to add to the embedded stage.  Modules will add
+                          init.d, conf.d files and packages as necessary to the
+                          embedded stage automatically.
+    """
+    
     def __init__(self, stage_conf, build_name, **keywds):
         self.seed           = None
         self.tarpath        = None
