@@ -11,6 +11,8 @@ class InhibitorAction(object):
     errors that can be passed back up in order to do cleaning first.
 
     @param name     - String representing this action
+    @param resume   - Allow the action sequence to resume where it left off it
+                      it was previously interrupted.
     """
     def __init__(self, name='BlankAction', resume=False):
         self.name               = name
@@ -54,6 +56,16 @@ class InhibitorAction(object):
 
 
 class InhibitorSnapshot(InhibitorAction):
+    """
+    Create a snapshot of an InhibitorSource
+
+    @param snapshot_source  - Source that we will generate a snapshot from.
+    @param name             - Unique string to identify the source.
+    @param exclude          - A string, list or tuple of patterns to not include in
+                              the snapshot.  Passed to rsync --exclude.
+    @param include          - String, passed to glob, of toplevel paths to include
+                              in the snapshot.
+    """
     def __init__(self, snapshot_source, name, exclude=None, include=None):
         super(InhibitorSnapshot, self).__init__(name='snapshot')
         self.dest       = None
