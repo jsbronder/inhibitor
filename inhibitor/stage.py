@@ -36,6 +36,32 @@ def make_conf_source(**keywds):
 
 
 class BaseStage(actions.InhibitorAction):
+    """
+    Basic stage building action.  Handles fetching sources and setting up the chroot
+    to be able to merge packages.  Also cleans everything up afterwards.
+
+    @param stage_conf       - Stage configuration, see below.
+    @param build_name       - Unique string to identify the stage.
+    @param stage_name       - Type of stage being built.  Default is base_stage.
+
+    Stage Configuration:
+        @param name         - 
+        @param snapshot     - InhibitorSource representing the portage tree.
+        @param overlays     - List of InhibitorSources' to use as portage overlays.
+        @param kernel       - Container for kernel configuration.
+            kernel_pkg      - String passed to emerge to get kernel package.
+            kconfig         - InhibitorSource that contains the kernel config.
+            genkernel       - Arguments to pass to genkernel when building the
+                              initramfs.
+            packages        - List of packages that should be installed after the
+                              kernel has been configured.
+        @param profile      - Portage profile to use.
+        @param seed         - Name of the seed stage to use for building.  Stage
+                              needs to be located in inhibitor's stagedir.
+        @param make_conf    - InhibitorSource for make.conf.
+        @param portage_conf - InhibitorSource with the contents for /etc/portage.
+
+    """
     def __init__(self, stage_conf, build_name, stage_name='base_stage', **keywds):
         self.build_name     = '%s-%s' %  (stage_name, build_name)
         self.conf           = stage_conf
@@ -256,6 +282,37 @@ class BaseStage(actions.InhibitorAction):
         ]
 
 class Stage4(BaseStage):
+    """
+    Stage 4 building action.  Handles fetching sources, setting up the chroot,
+    merging packages, configuring a kernel and running any specified scripts
+    inside the completed build.
+
+    @param stage_conf       - Stage configuration, see below.
+    @param build_name       - Unique string to identify the stage.
+    @param stage_name       - Type of stage being built.  Default is base_stage.
+
+    Stage Configuration:
+        @param name         - 
+        @param snapshot     - InhibitorSource representing the portage tree.
+        @param overlays     - List of InhibitorSources' to use as portage overlays.
+        @param kernel       - Container for kernel configuration.
+            kernel_pkg      - String passed to emerge to get kernel package.
+            kconfig         - InhibitorSource that contains the kernel config.
+            genkernel       - Arguments to pass to genkernel when building the
+                              initramfs.
+            packages        - List of packages that should be installed after the
+                              kernel has been configured.
+        @param profile      - Portage profile to use.
+        @param seed         - Name of the seed stage to use for building.  Stage
+                              needs to be located in inhibitor's stagedir.
+        @param make_conf    - InhibitorSource for make.conf.
+        @param portage_conf - InhibitorSource with the contents for /etc/portage.
+
+        @param scripts      - List of Scripts to run after merging all packages and
+                              building the kernel.  They run in order inside of the
+                              completed chroot from '/tmp/inhibitor/sh/'
+        @param packages     - List or String of packages to merge.
+    """
     def __init__(self, stage_conf, build_name, **keywds):
         self.package_list   = []
         self.scripts        = []
