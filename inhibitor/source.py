@@ -5,6 +5,12 @@ import types
 import util
 
 def create_source(src, **keywds):
+    """
+    Wrapper to create a Source object.
+
+    @param src          - Path to the source object.
+    @param **keywds     - Passed to the underlying source object.
+    """
     ret = None
     if type(src) == types.StringType:
         if src.startswith("git://"):
@@ -23,16 +29,14 @@ class _GenericSource(object):
     Generic source object.
 
     @param src                  - Source path.
-    @param dest                 - Destination within the stage4 chroot.
-    @param name                 - Unique identifier for this source object.  If
-                                  set to none, this is parsed out of the src dependent
-                                  upon type.
-    @param keep                 - Leave output in the stage4 build.
-    @param rev                  - Revision of the source to use.  See
- 
     @param inhibitor_state      - Inhibitor Configuration
-    @param src                  - Source path.
-    @param name                 - Identifier for this source object.
+    @param dest                 - Destination within the stage4 chroot.
+    @param keep                 - Leave output in the stage4 build.
+    @param mountable            - Will bind mounting suffice to provide this source.
+    @param cachedir             - Name of the cache directory.
+    @param ignore               - Files to be ignored when installing.  Either a function
+                                  returning true or false for a given path or a list of
+                                  patterns to be ignored.  See shutil.ignore_patterns.
     """
     def __init__(self, src, 
             inhibitor_state = None,
@@ -103,6 +107,21 @@ class _GenericSource(object):
         return
 
 class FileSource(_GenericSource):
+    """
+    File or directory backed source object.
+
+    @param src                  - Source path.
+    @param inhibitor_state      - Inhibitor Configuration
+    @param dest                 - Destination within the stage4 chroot.
+    @param keep                 - Leave output in the stage4 build.
+
+    Inherited from _GenericSource:
+    @param mountable            - Will bind mounting suffice to provide this source.
+    @param cachedir             - Name of the cache directory.
+    @param ignore               - Files to be ignored when installing.  Either a function
+                                  returning true or false for a given path or a list of
+                                  patterns to be ignored.  See shutil.ignore_patterns.
+    """
     def __init__(self, src, inhibitor_state = None, dest = None, keep = False, **keywds):
         real_src    = util.Path(src[6:])
         mountable   = False
@@ -128,6 +147,24 @@ class FileSource(_GenericSource):
 
 
 class FuncSource(_GenericSource):
+    """
+    Function backed source object.  If the function returns a string, it will be
+    written to dest.  If the function returns a (nested) dictionary, then starting
+    at dest, the path is represented by dictionary keys and the contents of the
+    files by the values (strings).
+
+    @param src                  - Source path.
+    @param inhibitor_state      - Inhibitor Configuration
+    @param dest                 - Destination within the stage4 chroot.
+    @param keep                 - Leave output in the stage4 build.
+
+    Inherited from _GenericSource:
+    @param mountable            - Will bind mounting suffice to provide this source.
+    @param cachedir             - Name of the cache directory.
+    @param ignore               - Files to be ignored when installing.  Either a function
+                                  returning true or false for a given path or a list of
+                                  patterns to be ignored.  See shutil.ignore_patterns.
+    """
     def __init__(self, src, inhibitor_state = None, dest = None, keep = False, **keywds):
         self.output = src(**keywds)
         if not type(self.output) in (types.DictType, types.StringType):
@@ -187,9 +224,21 @@ class FuncSource(_GenericSource):
 
 class GitSource(_GenericSource):
     """
-    Git source object.  Special case where we do not wipe out the
-    cachedir and instead pull from the origin and checkout branches.
-    """
+    Git backed source object.
+
+    @param src                  - Source path.
+    @param inhibitor_state      - Inhibitor Configuration
+    @param dest                 - Destination within the stage4 chroot.
+    @param keep                 - Leave output in the stage4 build.
+    @param rev                  - Commit, tag or branch to use.
+
+    Inherited from _GenericSource:
+    @param mountable            - Will bind mounting suffice to provide this source.
+    @param cachedir             - Name of the cache directory.
+    @param ignore               - Files to be ignored when installing.  Either a function
+                                  returning true or false for a given path or a list of
+                                  patterns to be ignored.  See shutil.ignore_patterns.
+     """
 
     def __init__(self, src, inhibitor_state = None, dest = None, keep = False, rev = None, **keywds):
         self.env        = {}
@@ -263,7 +312,17 @@ class GitSource(_GenericSource):
 
 
 class InhibitorScript(object):
-    def __init__(self, name, src, args = [], needs=[], **keywds):
+    """
+    Temporary script to be installed into the stage, run, then removed.
+
+    @param name     - Basename of the script.
+    @param src      - Source path of the script, passed to create_source().
+    @parm args      - List of arguments to be passed to the script.
+    @param needs    - List of Sources also required by this script, will all
+                      be temporarily stored in /tmp/inhibitor/sh.
+    """
+
+    def __init__(self, name, src, args = [], needs=[]):
         self.local_src = util.Path('/tmp/inhibitor/sh/').pjoin(name)
         self.script = create_source( 
             src,
@@ -310,9 +369,4 @@ class InhibitorScript(object):
             for arg in self.args:
                 cmd += " '%s'" % (arg,)
         return cmd
-
-
-
-
-
 
