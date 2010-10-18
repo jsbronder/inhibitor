@@ -9,7 +9,15 @@ class InhibitorState(object):
     Track the state of the current inhibitor build as well as holding
     the base configuration values.
 
-    @param paths    - Override default paths.
+    @param paths    - Container holding default paths.
+        cache       - Cache for Sources.
+        stages      - Storage for completed builds.
+        build       - Temporary staging directory for builds.
+        pkgs        - Storage for packages.
+        dist        - Storage for distfiles, shared across all builds.
+        kernel      - Temporary staging directory for building kernels.
+        state       - Tracks the state of each build in order to support resuming.
+        share       - Path to shared support files.
     """
     def __init__(self, paths={}):
 
@@ -42,6 +50,10 @@ class InhibitorState(object):
 
         
 class Inhibitor(object):
+    """
+    Holding class for Actions.  Serves to run and track the state
+    across multiple actions actions.
+    """
     def __init__(self):
         self.actions    = []
         self.state      = InhibitorState()
