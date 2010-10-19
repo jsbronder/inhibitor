@@ -43,6 +43,7 @@ class InhibitorState(object):
         self.current_action = None
 
     def makedirs(self):
+        """Create all the directories that may be needed during runtime."""
         for k in self.paths.keys:
             path = getattr(self.paths, k)
             if not os.path.exists(path):
@@ -60,9 +61,11 @@ class Inhibitor(object):
         self.state.makedirs()
 
     def add_action(self, action):
+        """Add the given action the the run queue."""
         self.actions.insert(0, action)
 
     def run(self):
+        """Run all of the actions on the queue."""
         while len(self.actions) > 0:
             self.run_action(self.actions.pop())
 
