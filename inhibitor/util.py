@@ -31,16 +31,27 @@ class InhibitorError(Exception):
         return ret
 
 class Path(types.StringType):
+    """
+    Wrapper around paths to ensure we canonicalize and join them correctly
+    """
     def __new__( cls, value ):
         return types.StringType.__new__(cls, os.path.normpath(value))
 
     def dname(self):
+        """Return path as a directory, i.e. a trailing '/'"""
         return str(self) + "/" 
 
     def pjoin(self, *paths):
+        """Return a new Path by joining this one with the specified paths"""
         return Path(self.dname() + '/'.join(paths))
 
 class Container(object):
+    """
+    Contains any number of named objects.  Very similar to a dictionary but
+    variables are simply access by keyword.
+
+    @param keys     - list of key value pairs.
+    """
     def __init__(self, **keys):
         self.keys = []
         for k, v in keys.items():
@@ -48,13 +59,22 @@ class Container(object):
             self.keys.append(k)
 
     def has(self, key):
+        """Return True if this container has the specified key"""
         return hasattr(self, key)
 
     def update(self, key, value):
+        """Update key with new value"""
         setattr(self, key, value)
         self.keys.append(key)
 
 class Mount(object):
+    """
+    Contains a mount definition.
+
+    @param src  - Path to the source of the mount path.
+    @param dest - Path, inside the root, to mount src.
+    @param root - Path to the root of the destination path.
+    """
     def __init__(self, src, dest, root):
         self.src    = Path(src)
         self.dest   = Path(dest)
@@ -66,6 +86,10 @@ class Mount(object):
             self.src, self.dest, self.root)
 
 class Step(Container):
+    """
+    Container for a function to be run, pairing it with the name of
+    the action the function will be preforming.
+    """
     def __init__(self, function, always=True, **keywds):
         self.function = types.FunctionType
         super(Step, self).__init__(function=function, always=always, **keywds)
@@ -92,9 +116,15 @@ def dbg(message):
 
 # Mounting utilities
 def mount(mp, mounts, options='-o bind'):
+    """
+    Activate (mount) a Mount.
+
+    @param mp       - Mount to activate.
+    @param mounts   - List of Mounts currently active.
+    @param options  - String of extra options to pass to the mount command
+    """
     if mp in mounts:
-        dbg("src=%s dest=%s root=%s already mounted" 
-            % (mp.src, mp.dest, mp.root))
+        dbg("Mount(%s) is already mounted" % (mp,))
         return
 
     full_dest = mp.root.pjoin(mp.dest)
@@ -105,9 +135,14 @@ def mount(mp, mounts, options='-o bind'):
     mounts.append(mp)
 
 def umount(mp, mounts):
+    """
+    Deactivate (unmount) a Mount.
+
+    @param mp       - Mount to deactivate.
+    @param mounts   - List of mounts currently active.
+    """
     if not mp in mounts:
-        dbg("src=%s dest=%s root=%s not mounted" 
-            % (mp.src, mp.dest, mp.root))
+        dbg("Mount(%s) is already unmounted" % (mp,))
         return
 
     while mp in mounts:
@@ -137,6 +172,11 @@ def umount(mp, mounts):
 
 
 def umount_all(mounts):
+    """
+    Deactivate (unmount) all Mounts.
+
+    @param mounts   - List of mounts currently active.
+    """
     mounts.reverse()
     while len(mounts) > 0:
         umount(mounts[0], mounts)
@@ -233,6 +273,8 @@ def cmd(cmdline, env={}, raise_exception=True, chdir=None, shell='/bin/bash'):
     @param cmdline          - Command to call, a string
     @param env              - Environment dictionary.  ({})
     @param raise_exception  - Raise exception on non-zero return. (True)
+    @param chdir            - Change to given directory before executing (None).
+    @param shell            - Shell to run the command in (/bin/bash).
 
     Return is the return code from the command.
     """
@@ -257,6 +299,8 @@ def cmd_out(cmdline, env={}, raise_exception=True, chdir=None, shell='/bin/bash'
     @param cmdline          - Command to call, a string
     @param env              - Environment dictionary.  ({})
     @param raise_exception  - Raise exception on non-zero return. (True)
+    @param chdir            - Change to given directory before executing (None).
+    @param shell            - Shell to run the command in (/bin/bash).
 
     Return is a pair:  (return code, output)
     """
@@ -273,6 +317,15 @@ def cmd_out(cmdline, env={}, raise_exception=True, chdir=None, shell='/bin/bash'
         raise
 
 def chroot(path, function, failuref=None, fargs={}, failure_args={}):
+    """
+    Run a function inside of a chroot.
+
+    @param path             - Root of the chroot.
+    @param function         - Function to run.
+    @param failuref         - Function to run on failure (None).
+    @param fargs            - Arguments to pass to function ({}).
+    @param failulre_args    - Arguments to pass to failure function ({})
+    """
     orig_root = os.open('/', os.O_RDONLY)
     orig_dir = os.path.realpath(os.curdir)
     old_env = {}
@@ -309,12 +362,23 @@ def chroot(path, function, failuref=None, fargs={}, failure_args={}):
     return ret
  
 def make_conf_dict(path):
+    """
+    Read a make.conf file and return it as a dictionary.
+
+    @param path - Path to make.conf file.
+    """
     if os.path.exists(path):
         return portage_util.getconfig(path, allow_sourcing=True)
     else:
         return {}
 
 def write_dict_bash(bd, path):
+    """
+    Write a dictionary in a bash sourceable format.
+
+    @param bd   - Dictionary of key/value strings to write.
+    @param path - Path to write to.
+    """
     if type(path) == types.StringType:
         path = Path(path)
 
@@ -330,7 +394,18 @@ def write_dict_bash(bd, path):
 
 def path_sync(src, targ, root='/', ignore=lambda x, y: [], file_copy_callback=None):
     """
-    TODO:  This is confusing enough it should probably be documented.
+    Sync one path to another precisely preserving the the layout of the source.  In
+    particular if chroot works in the source, it will work identically in the target.
+
+    @param src                  - Source path.
+    @param targ                 - Destination path.
+    @param root                 - Root of the target path, used to preserve non-relative
+                                  symlinks.  Defaults to /.
+    @param ignore               - If a function,  given a list of files returns a list 
+                                  to be ignored.  If a string, converted to a function
+                                  using shutil.ignore_patterns.
+    @param file_copy_callback   - After copying a file, this function will be called
+                                  with the arguments source path, destination path.
     """
     if type(ignore) == types.FunctionType:
         ignore_func = ignore
@@ -415,6 +490,9 @@ def strlist_to_list( strlist ):
     return ret
 
 def mkdir( path ):
+    """
+    Create a directory if it does not already exist.
+    """
     if not os.path.lexists(path):
         os.makedirs(path)
     return path
