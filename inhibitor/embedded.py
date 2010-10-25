@@ -345,6 +345,8 @@ class EmbeddedStage(stage.BaseStage):
         if self.seed:
             emb_root = emb_root.pjoin(self.target_root)
 
+        util.mkdir(emb_root.pjoin('etc/rc.d'))
+
         for initd in glob.iglob('%s/*' % emb_root.pjoin('etc/init.d')):
             int_path = initd.replace(emb_root, '')
             util.dbg('Adding %s to init' % int_path)
