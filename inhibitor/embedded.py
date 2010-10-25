@@ -329,6 +329,9 @@ class EmbeddedStage(stage.BaseStage):
         if self.seed:
             emb_root = emb_root.pjoin(self.target_root)
 
+        for d in 'init.d', 'conf.d':
+            util.mkdir(emb_root.pjoin('etc/%s' % (d,)))
+
         for m in self.modules:
             init = self.moduledir.pjoin('%s.init' % m)
             conf = self.moduledir.pjoin('%s.conf' % m)
