@@ -1,0 +1,15 @@
+Inhibitor is a python module that provides support for building Gentoo Linux
+OS releases.  It is designed to make generic stage4 builds as easy as possible
+while still supporting a high level of customization.  Inhibitor can be
+compared to other Gentoo release tools such as Catalyst or Metro.  However,
+Inhibitor focuses strictly on providing common functionality required to create
+an OS release and not on being the full-featured release tool itself.
+
+Configuring a build using Inhibitor is done in by creating a python script that
+imports Inhibitor.  This serves two purposes, it allows the configuration to be
+separate from the build system and allows full use of python in the
+configuration yielding the possibility that one configuration may actually
+support many different builds.
+
+See the examples directory for a basic stage4 and usb rescue build.
+
