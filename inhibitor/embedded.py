@@ -285,7 +285,6 @@ class EmbeddedStage(stage.BaseStage):
             else:
                 files = [ min_path ]
 
-            print files
             for path in files:
                 if self.seed:
                     if not os.path.lexists(self.target_root.pjoin(path)):
