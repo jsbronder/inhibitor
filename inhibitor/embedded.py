@@ -152,12 +152,15 @@ class EmbeddedStage(stage.BaseStage):
             src.install( root = emb_root )
            
         for t in ('/lib', '/usr/lib'):
-            target = emb_root.pjoin(t)
-            if os.path.lexists( target ):
-                os.unlink( target )
+            linkname = emb_root.pjoin(t)
+            target_path = os.path.join(os.path.dirname(linkname), os.readlink(libpath))
+
+            if os.path.lexists(linkname):
+                os.unlink(linkname)
             if os.path.islink( libpath ):
-                os.symlink(os.readlink(libpath), target)
-                util.mkdir( emb_root.pjoin( os.readlink(libpath) ) )
+                util.mkdir(target_path)
+                util.mkdir(os.path.dirname(linkname))
+                os.symlink(os.readlink(libpath), linkname)
 
     def make_profile_link(self):
         if self.seed:
