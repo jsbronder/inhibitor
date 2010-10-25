@@ -450,4 +450,17 @@ class EmbeddedStage(stage.BaseStage):
         util.info("Created %s" % (self.cpiopath,))
         if self.conf.has('kernel'):
             util.info("Kernel copied into %s" % (os.path.dirname(self.tarpath),) )
+    
+    def get_tarpath(self):
+        if self.tarpath:
+            return self.tarpath
+        else:
+            raise util.InhibitorError("Cannot get tarpath until post_conf has been called.")
+
+    def get_cpiopath(self):
+        if self.cpiopath:
+            return self.cpiopath
+        else:
+            raise util.InhibitorError("Cannot get cpiopath until post_conf has been called.")
+
 
