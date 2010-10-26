@@ -47,6 +47,7 @@ class EmbeddedStage(stage.BaseStage):
         self.seed           = None
         self.tarpath        = None
         self.cpiopath       = None
+        self.kernlinkpath   = None
         self.fs_add         = None
         self.files          = []
         self.copied_libs    = []
@@ -87,6 +88,7 @@ class EmbeddedStage(stage.BaseStage):
         self.moduledir      = self.istate.paths.share.pjoin('early-userspace/modules')
         self.tarpath        = self.istate.paths.stages.pjoin('%s/image.tar.bz2' % (self.build_name,))
         self.cpiopath       = self.istate.paths.stages.pjoin('%s/initramfs.gz' % (self.build_name,))
+        self.kernlinkpath   = self.istate.paths.stages.pjoin('%s/kernel' % (self.build_name,))
 
         if self.conf.has('files'):
             self.files = util.strlist_to_list(self.conf.files)
@@ -434,11 +436,11 @@ class EmbeddedStage(stage.BaseStage):
             kernel_link = r.pjoin('/boot/kernel')
             kernel_path = os.path.realpath( kernel_link )
             
-            if os.path.lexists( basedir.pjoin('kernel') ):
-                os.unlink(basedir.pjoin('kernel'))
+            if os.path.lexists(self.kernlinkpath):
+                os.unlink(self.kernlinkpath)
 
             shutil.copy2(kernel_path, basedir.pjoin( os.path.basename(kernel_path) ))
-            os.symlink(os.path.basename(kernel_path), basedir.pjoin('kernel'))
+            os.symlink(os.path.basename(kernel_path), self.kernlinkpath)
 
     def finish_sources(self):
         super(EmbeddedStage, self).finish_sources()
@@ -449,7 +451,7 @@ class EmbeddedStage(stage.BaseStage):
         util.info("Created %s" % (self.tarpath,))
         util.info("Created %s" % (self.cpiopath,))
         if self.conf.has('kernel'):
-            util.info("Kernel copied into %s" % (os.path.dirname(self.tarpath),) )
+            util.info("Kernel located at %s" % (self.kernlinkpath,))
     
     def get_tarpath(self):
         if self.tarpath:
@@ -462,5 +464,11 @@ class EmbeddedStage(stage.BaseStage):
             return self.cpiopath
         else:
             raise util.InhibitorError("Cannot get cpiopath until post_conf has been called.")
+
+    def get_kernlinkpath(self):
+        if self.kernlinkpath:
+            return self.kernlinkpath
+        else:
+            raise util.InhibitorError("Cannot get kernlinkpath until post_conf has been called.")
 
 
