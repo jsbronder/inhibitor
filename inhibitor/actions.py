@@ -152,3 +152,8 @@ class InhibitorSnapshot(InhibitorAction):
         archive.close()
         util.info('%s is ready.' % self.dest)
 
+    def get_snappath(self):
+        if self.dest:
+            return self.dest
+        else:
+            raise util.InhibitorError("Cannot get snappath until post_conf has been called.")
