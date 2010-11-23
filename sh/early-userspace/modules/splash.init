@@ -1,0 +1,8 @@
+#!/bin/sh /etc/rc-functions.sh
+START=01
+
+start () {
+    source /sbin/splash-functions.sh || return 0
+    splash_start
+}
+
