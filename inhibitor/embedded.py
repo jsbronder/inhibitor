@@ -283,14 +283,20 @@ class EmbeddedStage(stage.BaseStage):
     def copy_files(self):
         for min_path in self.files:
             if '*' in min_path:
-                files = glob.glob( min_path )
+                if self.seed:
+                    files = glob.glob(self.target_root.pjoin(min_path))
+                    strip_index = len(self.target_root)
+                    for i in range(0, len(files)):
+                        files[i] = files[i][strip_index:]
+                else:
+                    files = glob.glob(min_path)
             else:
                 files = [ min_path ]
-
+            
             for path in files:
                 if self.seed:
                     if not os.path.lexists(self.target_root.pjoin(path)):
-                        util.warn('Path %s does not exist' % (min_path,))
+                        util.warn('Path (%s,%s) does not exist' % (min_path, path))
                         continue
                     util.chroot(
                         path        = self.target_root,
