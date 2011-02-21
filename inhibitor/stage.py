@@ -142,9 +142,18 @@ class BaseStage(actions.InhibitorAction):
         for src in self.sources:
             src.install( root = self.target_root )
 
+        for m in ('proc', 'sys', 'dev'):
+            util.mount( self.aux_mounts[m], self.istate.mount_points )    
+        for m in ('resolv.conf', 'hosts'):
+            self.aux_sources[m].install( root = self.target_root )
+
     def remove_sources(self):
         for src in self.sources:
             src.remove()
+        for m in ('proc', 'sys', 'dev'):
+            util.umount( self.aux_mounts[m], self.istate.mount_points )
+        for m in ('resolv.conf', 'hosts'):
+            self.aux_sources[m].remove()
 
     def finish_sources(self):
         for src in self.sources:
@@ -468,7 +477,6 @@ class Stage4(BaseGentooStage):
         ret.append( util.Step(self.unpack_seed,             always=False)   )
         ret.append( util.Step(self.install_sources,         always=True)    )
         ret.append( util.Step(self.make_profile_link,       always=False)   )
-        ret.append( util.Step(self.merge_preperation,       always=True)    )
         ret.append( util.Step(self.merge_portage,           always=False)   )
         ret.append( util.Step(self.merge_system,            always=False)   )
         ret.append( util.Step(self.merge_packages,          always=False)   )
@@ -482,12 +490,6 @@ class Stage4(BaseGentooStage):
         ret.append( util.Step(self.clean_tmp,               always=True)    )
         ret.append( util.Step(self.pack,                    always=False)   )
         return ret
-
-    def merge_preperation(self):
-        for m in ('proc', 'sys', 'dev'):
-            util.mount( self.aux_mounts[m], self.istate.mount_points )    
-        for m in ('resolv.conf', 'hosts'):
-            self.aux_sources[m].install( root = self.target_root )
 
     def merge_portage(self):
         self._emerge('virtual/portage', flags='--oneshot --newuse')
@@ -534,19 +536,10 @@ class Stage4(BaseGentooStage):
         for script in self.scripts:
             script.remove()
 
-        for m in ('proc', 'sys', 'dev'):
-            util.umount( self.aux_mounts[m], self.istate.mount_points )
-
-        for m in ('resolv.conf', 'hosts'):
-            self.aux_sources[m].remove()
-
     def finish_sources(self):
         super(Stage4, self).finish_sources()
         for script in self.scripts:
             script.finish()
-
-        for m in ('resolv.conf', 'hosts'):
-            self.aux_sources[m].finish()
 
     def install_portage_conf(self):
         portage_cr = self.target_root.pjoin( self.env['PORTAGE_CONFIGROOT'] + '/etc/' )
