@@ -21,6 +21,7 @@ from source import (
 
 from stage import (
     BaseStage,
+    DebootstrapStage,
     Stage4,
 )
 

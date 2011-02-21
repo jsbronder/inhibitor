@@ -320,6 +320,80 @@ class BaseGentooStage(BaseStage):
             util.Step(self.clean_tmp,           always=True),
         ]
 
+class DebootstrapStage(actions.InhibitorAction):
+    """
+    Basic stage building action.  Handles fetching sources and setting up the chroot
+    to be able to merge packages.  Also cleans everything up afterwards.  This is
+    basically just a wrapper around the debootstrap(8) command.
+
+    @param stage_conf       - Stage configuration, see below.
+    @param build_name       - Unique string to identify the stage.
+    @param stage_name       - Type of stage being built.  Default is base_stage.
+
+    Stage Configuration:
+        @param name         - 
+        @param suite        - Debian/Ubuntu suite name
+        @param mirror       - Location of Apt repository
+        @param arch         - Target Architecture
+    """
+    def __init__(self, stage_conf, build_name, **keywds):
+        self.build_name     = 'debstage1-%s' %  (build_name)
+        self.conf           = stage_conf
+        self.suite          = None
+        self.mirror         = None
+        self.arch           = None
+        self.target_root    = None
+
+        for v in ('suite', 'mirror', 'arch'):
+            if self.conf.has(v):
+                setattr(self, v, getattr(self.conf, v))
+            else:
+                raise util.InhibitorError('No %s specified' % (v,))
+
+        super(DebootstrapStage, self).__init__(self.build_name, **keywds)
+
+    def post_conf(self, inhibitor_state):
+        super(DebootstrapStage, self).post_conf(inhibitor_state)
+        self.target_root = self.istate.paths.build.pjoin(self.build_name)
+        util.mkdir(self.target_root)
+
+    def get_action_sequence(self):
+        ret = [
+            util.Step(self.debootstrap_dl,  always=False),
+            util.Step(self.debootstrap_fin, always=False),
+            util.Step(self.apt_clean,       always=False),
+        ]
+        return ret
+
+    def debootstrap_dl(self):
+        cmdline = '/usr/sbin/debootstrap --download-only ' \
+                '--foreign --arch=%s --variant=minbase %s %s %s' % (
+            self.arch,
+            self.suite,
+            self.target_root,
+            self.mirror)
+
+        util.cmd(cmdline)
+
+    def debootstrap_fin(self):
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {
+                'cmdline': '/debootstrap/debootstrap --second-stage',
+            },
+        )
+
+    def apt_clean(self):
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {
+                'cmdline': 'apt-get clean',
+            },
+        )
+ 
+    
 class Stage4(BaseGentooStage):
     """
     Stage 4 building action.  Handles fetching sources, setting up the chroot,
