@@ -9,7 +9,7 @@ import stage
 import util
 import source
 
-class EmbeddedStage(stage.BaseStage):
+class EmbeddedStage(stage.BaseGentooStage):
     """
     Create an Embedded Stage, essentially a stage4 based on busybox providing the majority
     of the required functionality.
@@ -59,7 +59,7 @@ class EmbeddedStage(stage.BaseStage):
         self.ms             = magic.open(magic.MAGIC_NONE)
         self.stage_sources  = []
 
-        super(EmbeddedStage, self).__init__(stage_conf, build_name, 'embedded', **keywds)
+        super(EmbeddedStage, self).__init__(stage_conf, build_name, stage_name='embedded', **keywds)
         self.ms.load()
         self.ms.setflags(magic.MAGIC_MIME)
 
