@@ -46,20 +46,8 @@ class BaseStage(actions.InhibitorAction):
 
     Stage Configuration:
         @param name         - 
-        @param snapshot     - InhibitorSource representing the portage tree.
-        @param overlays     - List of InhibitorSources' to use as portage overlays.
-        @param kernel       - Container for kernel configuration.
-            kernel_pkg      - String passed to emerge to get kernel package.
-            kconfig         - InhibitorSource that contains the kernel config.
-            genkernel       - Arguments to pass to genkernel when building the
-                              initramfs.
-            packages        - List of packages that should be installed after the
-                              kernel has been configured.
-        @param profile      - Portage profile to use.
         @param seed         - Name of the seed stage to use for building.  Stage
                               needs to be located in inhibitor's stagedir.
-        @param make_conf    - InhibitorSource for make.conf.
-        @param portage_conf - InhibitorSource with the contents for /etc/portage.
 
     """
     def __init__(self, stage_conf, build_name, stage_name='base_stage', **keywds):
@@ -68,35 +56,20 @@ class BaseStage(actions.InhibitorAction):
         self.sources        = []
         self.istate         = None
         self.target_root    = None
-        self.profile        = None
         self.seed           = None
-        self.kernel         = None
-        self.pkgcache       = None
         self.aux_mounts     = {}
         self.aux_sources    = {}
-
         self.root           = util.Path('/')
-        self.portage_cr     = util.Path('/tmp/inhibitor/portage_configroot')
 
         self.env            = {
-            'PKGDIR':                   '/tmp/inhibitor/pkgs',
-            'DISTDIR':                  '/tmp/inhibitor/dist',
             'INHIBITOR_SCRIPT_ROOT':    '/tmp/inhibitor/sh',
             'ROOT':                     self.root,
-            'PORTAGE_CONFIGROOT':       self.portage_cr,
-            'PORTDIR':                  '/tmp/inhibitor/portdir'
         }
-
-        if self.conf.has('overlays'):
-            self.env['PORTDIR_OVERLAY'] = ''
 
         if self.conf.has('seed'):
             self.seed = self.conf.seed
         else:
             raise util.InhibitorError('No seed stage specified')
-
-        if self.conf.has('pkgcache'):
-            self.pkgcache = self.conf.pkgcache
 
         super(BaseStage, self).__init__(self.build_name, **keywds)
 
@@ -104,16 +77,11 @@ class BaseStage(actions.InhibitorAction):
         self.root = new_root
         self.env['ROOT'] = new_root
 
-    def update_portage_cr(self, new_portage_cr):
-        self.portage_cr = new_portage_cr
-        self.env['PORTAGE_CONFIGROOT'] = new_portage_cr
-
     def chroot_failure(self):
         util.umount_all(self.istate.mount_points)
 
-    def post_conf(self, inhibitor_state):
+    def post_conf_begin(self, inhibitor_state):
         super(BaseStage, self).post_conf(inhibitor_state)
-
         self.target_root    = self.istate.paths.build.pjoin(self.build_name)
         util.mkdir(self.target_root)
         if self.seed:
@@ -131,6 +99,125 @@ class BaseStage(actions.InhibitorAction):
                     'file://etc/hosts', keep = True, dest = '/etc/hosts'),
         }
                     
+        for i in glob.iglob( self.istate.paths.share.pjoin('*.sh') ):
+            j = source.create_source(
+                    "file://%s" % i,
+                    keep = False,
+                    dest = self.env['INHIBITOR_SCRIPT_ROOT'] + '/' + os.path.basename(i)
+                )
+            self.sources.append(j)
+
+    def post_conf_finish(self):
+        for src in self.sources:
+            src.post_conf( self.istate )
+            src.init()
+
+        for _, src in self.aux_sources.items():
+            src.post_conf( self.istate )
+            src.init()
+
+    def post_conf(self, inhibitor_state, run_finish=True):
+        self.post_conf_begin(inhibitor_state)
+        if run_finish:
+            self.post_conf_finish(inhibitor_state)
+
+    def unpack_seed(self):
+        if not os.path.isdir(self.seed):
+            if os.path.exists(self.seed):
+                os.unlink(self.seed)
+            seedfile = self.seed + '.tar.bz2'
+            util.info("Unpacking %s" % seedfile)
+            os.makedirs(self.seed)
+            try:
+                util.cmd('tar -xjpf %s -C %s/' % (seedfile, self.seed))
+            except:
+                shutil.rmtree(self.seed)
+                raise
+
+        util.info("Syncing %s to %s" % (self.seed.dname(), self.target_root.dname()) )
+        util.cmd('rsync -a --delete %s %s' %
+            (self.seed.dname(), self.target_root.dname()) )
+
+    def install_sources(self):
+        for src in self.sources:
+            src.install( root = self.target_root )
+
+    def remove_sources(self):
+        for src in self.sources:
+            src.remove()
+
+    def finish_sources(self):
+        for src in self.sources:
+            src.finish()
+        for _, src in self.aux_sources.items():
+            if not src in self.sources:
+                src.finish()
+
+    def clean_tmp(self):
+        shutil.rmtree(self.target_root.pjoin('/tmp/inhibitor'))
+
+    def get_action_sequence(self):
+        return [
+            util.Step(self.install_sources,     always=True),
+            util.Step(self.remove_sources,      always=True),
+            util.Step(self.finish_sources,      always=True),
+            util.Step(self.clean_tmp,           always=True),
+        ]
+
+class BaseGentooStage(BaseStage):
+    """
+    Basic stage building action.  Handles fetching sources and setting up the chroot
+    to be able to merge packages.  Also cleans everything up afterwards.
+
+    @param stage_conf       - Stage configuration, see below.
+    @param build_name       - Unique string to identify the stage.
+    @param stage_name       - Type of stage being built.  Default is base_stage.
+
+    Stage Configuration:
+        @param name         - 
+        @param snapshot     - InhibitorSource representing the portage tree.
+        @param overlays     - List of InhibitorSources' to use as portage overlays.
+        @param kernel       - Container for kernel configuration.
+            kernel_pkg      - String passed to emerge to get kernel package.
+            kconfig         - InhibitorSource that contains the kernel config.
+            genkernel       - Arguments to pass to genkernel when building the
+                              initramfs.
+            packages        - List of packages that should be installed after the
+                              kernel has been configured.
+        @param profile      - Portage profile to use.
+        @param seed         - Name of the seed stage to use for building.  Stage
+                              needs to be located in inhibitor's stagedir.
+        @param make_conf    - InhibitorSource for make.conf.
+        @param portage_conf - InhibitorSource with the contents for /etc/portage.
+
+    """
+    def __init__(self, stage_conf, build_name, stage_name='base_stage', **keywds):
+        super(BaseGentooStage, self).__init__(stage_conf, build_name, **keywds)
+        self.profile        = None
+        self.kernel         = None
+        self.pkgcache       = None
+
+        self.portage_cr     = util.Path('/tmp/inhibitor/portage_configroot')
+        self.env.update({
+            'PKGDIR':                   '/tmp/inhibitor/pkgs',
+            'DISTDIR':                  '/tmp/inhibitor/dist',
+            'PORTAGE_CONFIGROOT':       self.portage_cr,
+            'PORTDIR':                  '/tmp/inhibitor/portdir'
+        })
+
+        if self.conf.has('overlays'):
+            self.env['PORTDIR_OVERLAY'] = ''
+
+        if self.conf.has('pkgcache'):
+            self.pkgcache = self.conf.pkgcache
+
+
+    def update_portage_cr(self, new_portage_cr):
+        self.portage_cr = new_portage_cr
+        self.env['PORTAGE_CONFIGROOT'] = new_portage_cr
+
+    def post_conf(self, inhibitor_state):
+        super(BaseGentooStage, self).post_conf(inhibitor_state, run_finish=False)
         if not self.pkgcache:
             self.pkgcache = source.create_source(
                 "file://%s" % util.mkdir(self.istate.paths.pkgs.pjoin(self.build_name)) )
@@ -185,14 +272,6 @@ class BaseStage(actions.InhibitorAction):
                 self.env['PORTDIR_OVERLAY'] += ' /tmp/inhibitor/overlays/%d' % i
                 i += 1
 
-        for i in glob.iglob( self.istate.paths.share.pjoin('*.sh') ):
-            j = source.create_source(
-                    "file://%s" % i,
-                    keep = False,
-                    dest = self.env['INHIBITOR_SCRIPT_ROOT'] + '/' + os.path.basename(i)
-                )
-            self.sources.append(j)
-
         if self.conf.has('profile'):
             self.profile = self.conf.profile
         else:
@@ -212,35 +291,9 @@ class BaseStage(actions.InhibitorAction):
             self.conf.portage_conf.keep = True
             self.sources.append(self.conf.portage_conf)
 
-        for src in self.sources:
-            src.post_conf( self.istate )
-            src.init()
-
-        for _, src in self.aux_sources.items():
-            src.post_conf( self.istate )
-            src.init()
-
-    def unpack_seed(self):
-        if not os.path.isdir(self.seed):
-            if os.path.exists(self.seed):
-                os.unlink(self.seed)
-            seedfile = self.seed + '.tar.bz2'
-            util.info("Unpacking %s" % seedfile)
-            os.makedirs(self.seed)
-            try:
-                util.cmd('tar -xjpf %s -C %s/' % (seedfile, self.seed))
-            except:
-                shutil.rmtree(self.seed)
-                raise
-
-        util.info("Syncing %s to %s" % (self.seed.dname(), self.target_root.dname()) )
-        util.cmd('rsync -a --delete %s %s' %
-            (self.seed.dname(), self.target_root.dname()) )
-
-    def install_sources(self):
-        for src in self.sources:
-            src.install( root = self.target_root )
-
+        self.post_conf_finish()
+        
+    
     def make_profile_link(self):
         # XXX:  We also need to make the root profile link, Gentoo Bug 324179.
         for d in (self.target_root, self.target_root.pjoin(self.portage_cr)):
@@ -250,26 +303,12 @@ class BaseStage(actions.InhibitorAction):
                 os.unlink(targ)
             os.symlink(self.env['PORTDIR'] + '/profiles/%s' % self.profile, targ)
 
-    def remove_sources(self):
-        for src in self.sources:
-            src.remove()
-
-    def finish_sources(self):
-        for src in self.sources:
-            src.finish()
-        for _, src in self.aux_sources.items():
-            if not src in self.sources:
-                src.finish()
-
     def restore_profile_link(self):
         # XXX:  See make_profile_link.
         targ = self.target_root.pjoin('/etc/make.profile')
         if os.path.lexists(targ):
             os.unlink(targ)
         os.symlink('../usr/portage/profiles/%s' % self.profile, targ)
-
-    def clean_tmp(self):
-        shutil.rmtree(self.target_root.pjoin('/tmp/inhibitor'))
 
     def get_action_sequence(self):
         return [
@@ -281,7 +320,7 @@ class BaseStage(actions.InhibitorAction):
             util.Step(self.clean_tmp,           always=True),
         ]
 
-class Stage4(BaseStage):
+class Stage4(BaseGentooStage):
     """
     Stage 4 building action.  Handles fetching sources, setting up the chroot,
     merging packages, configuring a kernel and running any specified scripts
