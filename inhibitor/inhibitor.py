@@ -54,10 +54,20 @@ class Inhibitor(object):
     """
     Holding class for Actions.  Serves to run and track the state
     across multiple actions actions.
+
+    @param paths    - Container holding default paths.
+        cache       - Cache for Sources.
+        stages      - Storage for completed builds.
+        build       - Temporary staging directory for builds.
+        pkgs        - Storage for packages.
+        dist        - Storage for distfiles, shared across all builds.
+        kernel      - Temporary staging directory for building kernels.
+        state       - Tracks the state of each build in order to support resuming.
+        share       - Path to shared support files.
     """
-    def __init__(self):
+    def __init__(self, paths={}):
         self.actions    = []
-        self.state      = InhibitorState()
+        self.state      = InhibitorState(paths=paths)
         self.state.makedirs()
 
     def add_action(self, action):
