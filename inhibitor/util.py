@@ -8,11 +8,11 @@ import glob
 import signal
 import time
 
-# XXX:  To remove
+# This is only needed for Gentoo builds.
 try:
-    import portage.util as portage_util
+    import portage.util
 except ImportError:
-    import portage_util
+    pass
 
 INHIBITOR_DEBUG = False
 
@@ -368,7 +368,7 @@ def make_conf_dict(path):
     @param path - Path to make.conf file.
     """
     if os.path.exists(path):
-        return portage_util.getconfig(path, allow_sourcing=True)
+        return portage.util.getconfig(path, allow_sourcing=True)
     else:
         return {}
 
