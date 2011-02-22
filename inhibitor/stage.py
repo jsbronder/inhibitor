@@ -56,6 +56,7 @@ class BaseStage(actions.InhibitorAction):
         self.sources        = []
         self.istate         = None
         self.target_root    = None
+        self.tarpath        = None
         self.seed           = None
         self.aux_mounts     = {}
         self.aux_sources    = {}
@@ -83,6 +84,7 @@ class BaseStage(actions.InhibitorAction):
     def post_conf_begin(self, inhibitor_state):
         super(BaseStage, self).post_conf(inhibitor_state)
         self.target_root    = self.istate.paths.build.pjoin(self.build_name)
+        self.tarpath        = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
         util.mkdir(self.target_root)
         if self.seed:
             self.seed       = self.istate.paths.stages.pjoin(self.seed)
@@ -173,6 +175,16 @@ class BaseStage(actions.InhibitorAction):
             util.Step(self.finish_sources,      always=True),
             util.Step(self.clean_tmp,           always=True),
         ]
+
+    def pack(self):
+        archive = tarfile.open(self.tarpath, 'w:bz2')
+        archive.add(self.target_root,
+            arcname = '/',
+            recursive = True,
+        )
+        archive.close()
+        util.info("Created %s" % (self.tarpath,))
+
 
 class BaseGentooStage(BaseStage):
     """
@@ -330,6 +342,7 @@ class BaseGentooStage(BaseStage):
             util.Step(self.clean_tmp,           always=True),
         ]
 
+
 class Stage4(BaseGentooStage):
     """
     Stage 4 building action.  Handles fetching sources, setting up the chroot,
@@ -365,14 +378,12 @@ class Stage4(BaseGentooStage):
     def __init__(self, stage_conf, build_name, **keywds):
         self.package_list   = []
         self.scripts        = []
-        self.tarpath        = None
 
         super(Stage4, self).__init__(stage_conf, build_name, 'stage4', **keywds)
         self.emerge_cmd     = '%s/inhibitor-run.sh run_emerge ' % (self.env['INHIBITOR_SCRIPT_ROOT'],)
 
     def post_conf(self, inhibitor_state):
         super(Stage4, self).post_conf(inhibitor_state)
-        self.tarpath    = self.istate.paths.stages.pjoin(self.build_name + '.tar.bz2')
         
         if self.conf.has('scripts'):
             self.scripts = self.conf.scripts
@@ -472,14 +483,4 @@ class Stage4(BaseGentooStage):
         portage_cr = self.target_root.pjoin( self.env['PORTAGE_CONFIGROOT'] + '/etc/' )
         dest = self.target_root.pjoin('/etc/')
         util.path_sync(portage_cr, dest)
-
-    def pack(self):
-        archive = tarfile.open(self.tarpath, 'w:bz2')
-        archive.add(self.target_root,
-            arcname = '/',
-            recursive = True,
-        )
-        archive.close()
-        util.info("Created %s" % (self.tarpath,))
-
 
