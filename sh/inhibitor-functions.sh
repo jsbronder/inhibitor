@@ -47,6 +47,29 @@ die() {
     exit 1
 }
 
+deb_disable_init() {
+    local replace="start-stop-daemon initctl init"
+    for f in ${replace}; do
+        if [ -x /sbin/${f} ]; then
+            mv /sbin/${f}{,-bkup}
+            printf "%s\n%s\n" \
+                "#!/bin/sh" \
+                "echo '$f disabled during non-interactive build'" \
+                > /sbin/${f}
+            chmod 755 /sbin/${f}
+        fi
+    done
+}
+
+deb_enable_init() {
+    local replace="start-stop-daemon initctl init"
+    for f in ${replace}; do
+        if [ -x /sbin/${f}-bkup ]; then
+            mv /sbin/${f}{-bkup,}
+        fi
+    done
+}
+
 _init() {
     if [ -x /usr/sbin/env-update ]; then
         /usr/sbin/env-update || die 'env-update failed'
@@ -89,6 +112,35 @@ _run_emerge() {
 }
 run_emerge() {
     _run_emerge $*
+}
+
+_run_apt_install() {
+    echo
+    einfo "Apt-get installing $*"
+    echo
+    
+    export LC_ALL=C
+    export DEBIAN_FRONTEND='noninteractive'
+    export PATH
+
+    DIE_ON_FAIL=${DIE_ON_FAIL:-1}
+    deb_disable_init
+    apt-get install --assume-yes --force-yes \
+        --no-install-recommends --auto-remove \
+        $*
+    rc=$?
+    deb_enable_init
+    if [ ${rc} -ne 0 ]; then
+        if [ ${DIE_ON_FAIL} -eq 0 ]; then
+            die "apt-get install failed"
+        else
+            return ${rc}
+        fi
+    fi
+    return 0
+}
+run_apt_install() {
+    _run_apt_install $*
 }
 
 source_wrapper() {

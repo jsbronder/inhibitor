@@ -23,6 +23,7 @@ from stage import (
     BaseStage,
     DebootstrapStage,
     Stage4,
+    DebianStage,
 )
 
 from util import (

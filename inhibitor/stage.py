@@ -570,6 +570,114 @@ class Stage4(BaseGentooStage):
         dest = self.target_root.pjoin('/etc/')
         util.path_sync(portage_cr, dest)
 
+
+class DebianStage(BaseStage):
+    """
+    Debian image building action.  Handles fetching sources, setting up the chroot,
+    merging packages and running any specified scripts inside the completed build.
+
+    @param stage_conf       - Stage configuration, see below.
+    @param build_name       - Unique string to identify the stage.
+    @param stage_name       - Type of stage being built.  Default is base_stage.
+
+    Stage Configuration:
+        @param name         - 
+        @param sources_list - InhibitorSource with contents for /etc/apt/sources.list
+        @param seed         - Name of the seed stage to use for building.  Stage
+                              needs to be located in inhibitor's stagedir.
+        @param scripts      - List of Scripts to run after merging all packages and
+                              building the kernel.  They run in order inside of the
+                              completed chroot from '/tmp/inhibitor/sh/'
+        @param packages     - List or String of packages to merge.
+    """
+    def __init__(self, stage_conf, build_name, **keywds):
+        self.package_list   = []
+        self.scripts        = []
+        self.sources_list   = None
+
+        super(DebianStage, self).__init__(stage_conf, build_name, 'debimg', **keywds)
+
+    def post_conf(self, inhibitor_state):
+        super(DebianStage, self).post_conf(inhibitor_state, run_finish=False)
+
+        if self.conf.has('sources_list'):
+            self.sources_list = self.conf.sources_list
+            self.sources_list.keep = True
+            self.sources_list.dest = '/etc/apt/sources.list'
+            self.sources.append(self.sources_list)
+        else:
+            raise util.InhibitorError('No sources.list specified')
+        
+        if self.conf.has('scripts'):
+            self.scripts = self.conf.scripts
+            for script in self.conf.scripts:
+                script.post_conf(inhibitor_state)
+
+        if self.conf.has('packages'):
+            self.package_list = util.strlist_to_list(self.conf.packages)
+        else:
+            raise util.InhibitorError('No packages specified')
+        
+        self.post_conf_finish()
+ 
+    def get_action_sequence(self):
+        return [
+            util.Step(self.unpack_seed,     always=False),
+            util.Step(self.install_sources, always=True),
+            util.Step(self.apt_update,      always=False),
+            util.Step(self.merge_packages,  always=False),
+            util.Step(self.run_scripts,     always=False),
+            util.Step(self.remove_sources,  always=True),
+            util.Step(self.finish_sources,  always=True),
+            util.Step(self.apt_clean,       always=True),
+            util.Step(self.clean_tmp,       always=True),
+            util.Step(self.pack,            always=False),
+        ]
+
+    def apt_update(self):
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {'cmdline': 'apt-get update',},
+            failuref = self.chroot_failure
         )
 
+    def merge_packages(self):
+        cmd  = '%s/inhibitor-run.sh run_apt_install %s' % (
+            self.env['INHIBITOR_SCRIPT_ROOT'],
+            ' '.join(self.package_list),
+        )
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {'cmdline': cmd},
+            failuref = self.chroot_failure
+        )
 
+    def run_scripts(self):
+        for script in self.scripts: 
+            script.install( root = self.target_root )
+            util.chroot(
+                path = self.target_root,
+                function = util.cmd,
+                fargs = {'cmdline': script.cmdline(), 'env':self.env},
+                failuref = self.chroot_failure
+            )
+
+    def remove_sources(self):
+        super(DebianStage, self).remove_sources()
+        for script in self.scripts:
+            script.remove()
+
+    def finish_sources(self):
+        super(DebianStage, self).finish_sources()
+        for script in self.scripts:
+            script.finish()
+
+    def apt_clean(self):
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {'cmdline': 'apt-get clean',},
+            failuref = self.chroot_failure
+        )
