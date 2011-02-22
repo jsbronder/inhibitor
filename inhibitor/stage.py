@@ -91,6 +91,7 @@ class BaseStage(actions.InhibitorAction):
             'proc': util.Mount('/proc', '/proc', self.target_root),
             'sys':  util.Mount('/sys',  '/sys',  self.target_root),
             'dev':  util.Mount('/dev',  '/dev',  self.target_root),
+            'devpts':   util.Mount('/dev/pts',  '/dev/pts', self.target_root),
         }
         self.aux_sources = {
             'resolv.conf': source.create_source(
@@ -142,7 +143,7 @@ class BaseStage(actions.InhibitorAction):
         for src in self.sources:
             src.install( root = self.target_root )
 
-        for m in ('proc', 'sys', 'dev'):
+        for m in ('proc', 'sys', 'dev', 'devpts'):
             util.mount( self.aux_mounts[m], self.istate.mount_points )    
         for m in ('resolv.conf', 'hosts'):
             self.aux_sources[m].install( root = self.target_root )
@@ -150,7 +151,7 @@ class BaseStage(actions.InhibitorAction):
     def remove_sources(self):
         for src in self.sources:
             src.remove()
-        for m in ('proc', 'sys', 'dev'):
+        for m in ('proc', 'sys', 'devpts', 'dev'):
             util.umount( self.aux_mounts[m], self.istate.mount_points )
         for m in ('resolv.conf', 'hosts'):
             self.aux_sources[m].remove()
