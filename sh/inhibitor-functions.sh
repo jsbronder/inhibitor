@@ -48,7 +48,9 @@ die() {
 }
 
 _init() {
-    /usr/sbin/env-update || die 'env-update failed'
+    if [ -x /usr/sbin/env-update ]; then
+        /usr/sbin/env-update || die 'env-update failed'
+    fi
     source /etc/profile || die 'sourcing /etc/profile failed'
 }
 init() {
