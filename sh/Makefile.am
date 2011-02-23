@@ -13,7 +13,7 @@ install-exec-hook:
 		install -d -m755 $(DESTDIR)/$(datadir)/$(PACKAGE)/early-userspace/$$(dirname $${subdir}); \
 		install -m755 $$f $(DESTDIR)/$(datadir)/$(PACKAGE)/early-userspace/$${subdir}; \
 	done
-	$(LN_S) bin/busybox $(DESTDIR)/$(datadir)/$(PACKAGE)/early-userspace/root/init
+	$(LN_S) -f bin/busybox $(DESTDIR)/$(datadir)/$(PACKAGE)/early-userspace/root/init
 		
 uninstall-local:
 	rm -r $(DESTDIR)/$(datadir)/$(PACKAGE)/early-userspace
