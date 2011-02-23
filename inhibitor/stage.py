@@ -122,7 +122,7 @@ class BaseStage(actions.InhibitorAction):
     def post_conf(self, inhibitor_state, run_finish=True):
         self.post_conf_begin(inhibitor_state)
         if run_finish:
-            self.post_conf_finish(inhibitor_state)
+            self.post_conf_finish()
 
     def unpack_seed(self):
         if not os.path.isdir(self.seed):
