@@ -155,11 +155,11 @@ class EmbeddedStage(stage.BaseGentooStage):
            
         for t in ('/lib', '/usr/lib'):
             linkname = emb_root.pjoin(t)
-            target_path = os.path.join(os.path.dirname(linkname), os.readlink(libpath))
+            if os.path.islink(libpath):
+                target_path = os.path.join(os.path.dirname(linkname), os.readlink(libpath))
 
-            if os.path.lexists(linkname):
-                os.unlink(linkname)
-            if os.path.islink( libpath ):
+                if os.path.lexists(linkname):
+                    os.unlink(linkname)
                 util.mkdir(target_path)
                 util.mkdir(os.path.dirname(linkname))
                 os.symlink(os.readlink(libpath), linkname)
