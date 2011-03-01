@@ -48,6 +48,8 @@ class BaseStage(actions.InhibitorAction):
         @param name         - 
         @param seed         - Name of the seed stage to use for building.  Stage
                               needs to be located in inhibitor's stagedir.
+        @param fs_overlay   - InhibitorSource of files to be added to the stage.
+                              The files are added during install_sources().
 
     """
     def __init__(self, stage_conf, build_name, stage_name='base_stage', **keywds):
@@ -58,6 +60,7 @@ class BaseStage(actions.InhibitorAction):
         self.target_root    = None
         self.tarpath        = None
         self.seed           = None
+        self.fs_overlay     = None
         self.aux_mounts     = {}
         self.aux_sources    = {}
         self.root           = util.Path('/')
@@ -110,6 +113,12 @@ class BaseStage(actions.InhibitorAction):
                 )
             self.sources.append(j)
 
+        if self.conf.has('fs_overlay'):
+            self.fs_overlay = self.conf.fs_overlay
+            self.fs_overlay.keep = True
+            self.fs_overlay.dest = util.Path('/')
+            self.sources.append(self.fs_overlay)
+
     def post_conf_finish(self):
         for src in self.sources:
             src.post_conf( self.istate )
@@ -151,6 +160,11 @@ class BaseStage(actions.InhibitorAction):
             self.aux_sources[m].install( root = self.target_root )
 
     def remove_sources(self):
+        if self.fs_overlay:
+            # Previous actions may have overwritten the fs_overlay, so
+            # it needs to be reinstalled one last time.
+            self.fs_overlay.install( root = self.target_root )
+
         for src in self.sources:
             src.remove()
         for m in ('proc', 'sys', 'devpts', 'dev'):
