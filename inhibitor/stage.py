@@ -228,7 +228,7 @@ class BaseGentooStage(BaseStage):
 
     """
     def __init__(self, stage_conf, build_name, stage_name='base_stage', **keywds):
-        super(BaseGentooStage, self).__init__(stage_conf, build_name, **keywds)
+        super(BaseGentooStage, self).__init__(stage_conf, build_name, stage_name=stage_name, **keywds)
         self.profile        = None
         self.kernel         = None
         self.pkgcache       = None
