@@ -73,6 +73,8 @@ deb_enable_init() {
 _init() {
     if [ -x /usr/sbin/env-update ]; then
         /usr/sbin/env-update || die 'env-update failed'
+    elif [ -x /sbin/ldconfig ]; then
+        /sbin/ldconfig
     fi
     source /etc/profile || die 'sourcing /etc/profile failed'
 }
