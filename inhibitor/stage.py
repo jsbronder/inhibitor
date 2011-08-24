@@ -447,12 +447,12 @@ class Stage4(BaseGentooStage):
         self._emerge('sys-apps/portage', flags='--oneshot --newuse')
 
     def merge_system(self):
-        self._emerge('system', flags='--deep --newuse')
+        self._emerge('system', flags='--deep --newuse --update')
 
     def merge_packages(self):
         package_str = ' '.join(self.package_list)
         package_str = package_str.replace('\n', ' ')
-        self._emerge(package_str, flags='--deep --newuse')
+        self._emerge(package_str, flags='--deep --newuse --update')
 
     def merge_kernel(self):
         args = ['--build_name', self.build_name,
