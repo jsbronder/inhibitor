@@ -91,7 +91,7 @@ install_initramfs() {
         --bootdir=${KROOT}/boot/ \
         --no-mountboot \
         --disklabel \
-        initrd  || die "Genkernel failed"
+        ramdisk || die "Genkernel failed"
 
     mv ${KROOT}/boot/initramfs-${kname}-*-${KERNEL_RELEASE} \
        ${KROOT}/boot/initramfs-${KERNEL_RELEASE} \
