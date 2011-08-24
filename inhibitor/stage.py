@@ -444,7 +444,7 @@ class Stage4(BaseGentooStage):
         return ret
 
     def merge_portage(self):
-        self._emerge('virtual/portage', flags='--oneshot --newuse')
+        self._emerge('sys-apps/portage', flags='--oneshot --newuse')
 
     def merge_system(self):
         self._emerge('system', flags='--deep --newuse')
