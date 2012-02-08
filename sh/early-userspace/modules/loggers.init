@@ -18,8 +18,8 @@ start () {
 }
 
 stop () {
-    killall syslogd 1>/dev/null 2>/dev/null 
-    killall klogd 1>/dev/null 2>/dev/null 
+    killall syslogd 1>/dev/null 2>/dev/null
+    killall klogd 1>/dev/null 2>/dev/null
 }
-    
-    
+
+

@@ -39,8 +39,8 @@ class InhibitorAction(object):
     def run(self):
         for action in self.get_action_sequence():
             resume_path = self.statedir.pjoin('resume-%s-%s' % (self.name, action.name))
-            if ( self.resume 
-                    and action.always == False 
+            if ( self.resume
+                    and action.always == False
                     and os.path.exists(resume_path) ):
                 continue
             # Errors are caught by Inhibitor()

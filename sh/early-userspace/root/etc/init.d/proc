@@ -6,4 +6,4 @@ start () {
     [ -d /proc ] || mkdir /proc
     mount -n -t proc proc /proc || die "Failed to mount /proc"
 }
-    
+

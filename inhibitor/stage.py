@@ -45,7 +45,7 @@ class BaseStage(actions.InhibitorAction):
     @param stage_name       - Type of stage being built.  Default is base_stage.
 
     Stage Configuration:
-        @param name         - 
+        @param name         -
         @param seed         - Name of the seed stage to use for building.  Stage
                               needs to be located in inhibitor's stagedir.
         @param fs_overlay   - InhibitorSource of files to be added to the stage.
@@ -104,7 +104,7 @@ class BaseStage(actions.InhibitorAction):
             'hosts':        source.create_source(
                     'file://etc/hosts', keep = True, dest = '/etc/hosts'),
         }
-                    
+
         for i in glob.iglob( self.istate.paths.share.pjoin('*.sh') ):
             j = source.create_source(
                     "file://%s" % i,
@@ -155,7 +155,7 @@ class BaseStage(actions.InhibitorAction):
             src.install( root = self.target_root )
 
         for m in ('proc', 'sys', 'dev', 'devpts'):
-            util.mount( self.aux_mounts[m], self.istate.mount_points )    
+            util.mount( self.aux_mounts[m], self.istate.mount_points )
         for m in ('resolv.conf', 'hosts'):
             self.aux_sources[m].install( root = self.target_root )
 
@@ -210,7 +210,7 @@ class BaseGentooStage(BaseStage):
     @param stage_name       - Type of stage being built.  Default is base_stage.
 
     Stage Configuration:
-        @param name         - 
+        @param name         -
         @param snapshot     - InhibitorSource representing the portage tree.
         @param overlays     - List of InhibitorSources' to use as portage overlays.
         @param kernel       - Container for kernel configuration.
@@ -293,7 +293,7 @@ class BaseGentooStage(BaseStage):
             self.sources.append(self.conf.snapshot)
         else:
             _, portdir = util.cmd_out('portageq portdir', raise_exception=True)
-            self.sources.append( 
+            self.sources.append(
                 source.create_source( 'file://' + portdir,
                     keep = False,
                     dest = util.Path( self.env['PORTDIR'] ))
@@ -328,8 +328,8 @@ class BaseGentooStage(BaseStage):
             self.sources.append(self.conf.portage_conf)
 
         self.post_conf_finish()
-        
-    
+
+
     def make_profile_link(self):
         # XXX:  We also need to make the root profile link, Gentoo Bug 324179.
         for d in (self.target_root, self.target_root.pjoin(self.portage_cr)):
@@ -368,7 +368,7 @@ class Stage4(BaseGentooStage):
     @param stage_name       - Type of stage being built.  Default is base_stage.
 
     Stage Configuration:
-        @param name         - 
+        @param name         -
         @param snapshot     - InhibitorSource representing the portage tree.
         @param overlays     - List of InhibitorSources' to use as portage overlays.
         @param kernel       - Container for kernel configuration.
@@ -398,7 +398,7 @@ class Stage4(BaseGentooStage):
 
     def post_conf(self, inhibitor_state):
         super(Stage4, self).post_conf(inhibitor_state)
-        
+
         if self.conf.has('scripts'):
             self.scripts = self.conf.scripts
             for script in self.conf.scripts:
@@ -408,7 +408,7 @@ class Stage4(BaseGentooStage):
             self.package_list = util.strlist_to_list(self.conf.packages)
         else:
             raise util.InhibitorError('No packages specified')
-        
+
     def _emerge(self, packages, flags=''):
         util.chroot(
             path = self.target_root,
@@ -421,7 +421,7 @@ class Stage4(BaseGentooStage):
                 ),
                 'env': self.env
             },
-            failuref = self.chroot_failure 
+            failuref = self.chroot_failure
         )
 
     def get_action_sequence(self):
@@ -474,7 +474,7 @@ class Stage4(BaseGentooStage):
         )
 
     def run_scripts(self):
-        for script in self.scripts: 
+        for script in self.scripts:
             script.install( root = self.target_root )
             util.chroot(
                 path = self.target_root,

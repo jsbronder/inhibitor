@@ -46,16 +46,16 @@ post_kern_merge() {
     if [ -z "${POST_KERN_PKGS}" ]; then
         return
     fi
-  
+
     mkdir -p /etc/portage/profile/ &>/dev/null
     echo 'sys-kernel/gentoo-sources-99' >> /etc/portage/profile/package.provided
     local old_sym=$(readlink /usr/src/linux)
 
     einfo "Installing post kernel build packages"
-    ln -snf ${KROOT}/usr/src/linux-${KERNEL_RELEASE} /usr/src/linux 
+    ln -snf ${KROOT}/usr/src/linux-${KERNEL_RELEASE} /usr/src/linux
     DIE_ON_FAIL=0 run_emerge -u ${POST_KERN_PKGS}
     rc=$?
-    
+
     if [ -z "${old_sym}" ]; then
         rm /usr/src/linux
     else
@@ -71,7 +71,7 @@ post_kern_merge() {
         die "emerge failed."
     fi
 }
-    
+
 install_initramfs() {
     local rm_genkernel=true
     local kname=${KPN%-sources*}
@@ -81,7 +81,7 @@ install_initramfs() {
     else
         run_emerge -1 sys-kernel/genkernel
     fi
-  
+
     einfo "Building and installing initramfs"
     /usr/bin/genkernel ${GENKERNEL} \
         --kernname=${KPN%-sources} \
@@ -96,7 +96,7 @@ install_initramfs() {
     mv ${KROOT}/boot/initramfs-${kname}-*-${KERNEL_RELEASE} \
        ${KROOT}/boot/initramfs-${KERNEL_RELEASE} \
        || die "Failed to sanitize genkernel intramfs filename"
- 
+
     ln -snf initramfs-${KERNEL_RELEASE} ${KROOT}/boot/initramfs
     ${rm_genkernel} && emerge -C sys-kernel/genkernel
 }
@@ -123,7 +123,7 @@ cached() {
 
     [ -f ${KCACHE}/tarhash ] || return 1
     [ -f ${tarpath} ] || return 1
-    
+
     sha512sum ${tarpath} \
         | cut -d' ' -f 1 \
         > ${KROOT}/.newhash
@@ -134,7 +134,7 @@ init() {
     _init
     einfo "Preparing to build and install the kernel"
     local kpkg vers
-    
+
     kpkg=$(portageq best_visible / "${KERNEL_PKG}")
     [ ${?} -eq 0 -a -n "${kpkg}" ] || die "Failed to resolve best_visible ${KERNEL_PKG}"
     vers="$(printf "%s\n%s\n%s\n" \
@@ -199,7 +199,7 @@ fi
 init
 if ! cached; then
     einfo "No cached kernel build found..."
-    install_kernel 
+    install_kernel
     [ -n "${GENKERNEL}" ] && install_initramfs
     create_tarball
 fi

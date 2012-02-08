@@ -2,6 +2,6 @@
 STOP=70
 
 stop() {
-    sync 
+    sync
     umount -a -r
 }

@@ -42,7 +42,7 @@ class EmbeddedStage(stage.BaseGentooStage):
                           init.d, conf.d files and packages as necessary to the
                           embedded stage automatically.
     """
-    
+
     def __init__(self, stage_conf, build_name, **keywds):
         self.seed           = None
         self.tarpath        = None
@@ -63,7 +63,7 @@ class EmbeddedStage(stage.BaseGentooStage):
         self.ms.load()
         self.ms.setflags(magic.MAGIC_MIME)
 
-    
+
     def post_conf(self, inhibitor_state):
         if self.conf.has('seed'):
             self.seed = self.conf.seed
@@ -152,7 +152,7 @@ class EmbeddedStage(stage.BaseGentooStage):
 
         for src in self.stage_sources:
             src.install( root = emb_root )
-           
+
         for t in ('/lib', '/usr/lib'):
             linkname = emb_root.pjoin(t)
             if os.path.islink(libpath):
@@ -198,12 +198,12 @@ class EmbeddedStage(stage.BaseGentooStage):
             use += ' static'
         use += ' make-symlinks'
         env.update(self.env)
-        env['USE'] = use 
+        env['USE'] = use
         env['ROOT'] = self.target_root
 
         cmdline = '%s/inhibitor-run.sh run_emerge --newuse --nodeps sys-apps/busybox' \
                 % self.env['INHIBITOR_SCRIPT_ROOT']
-      
+
         if self.seed:
             util.chroot(
                 path        = self.target_root,
@@ -217,7 +217,7 @@ class EmbeddedStage(stage.BaseGentooStage):
                 fargs       = {'src':'/bin/busybox', '_':None},
                 failuref    = self.chroot_failure
             )
- 
+
         else:
             util.cmd( cmdline, env = env )
             self.path_sync_callback('/bin/busybox', None)
@@ -244,7 +244,7 @@ class EmbeddedStage(stage.BaseGentooStage):
         if binp in self.checked_ldd:
             return []
         self.checked_ldd.append(binp)
-            
+
         cmdline = 'ldd %s' % (binp,)
 
         rc, output = util.cmd_out( cmdline, raise_exception=False)
@@ -267,7 +267,7 @@ class EmbeddedStage(stage.BaseGentooStage):
         try:
             mime_type = self.ms.file(src).split(';')[0]
         except AttributeError:
-            return 
+            return
         if not mime_type in ('application/x-executable', 'application/x-sharedlib'):
             return
 
@@ -292,7 +292,7 @@ class EmbeddedStage(stage.BaseGentooStage):
                     files = glob.glob(min_path)
             else:
                 files = [ min_path ]
-            
+
             for path in files:
                 if self.seed:
                     if not os.path.lexists(self.target_root.pjoin(path)):
@@ -408,7 +408,7 @@ class EmbeddedStage(stage.BaseGentooStage):
             '/etc/portage',     # Busybox emerge.
             '/lib/rcscripts',   # Busybox emerge
         ]
-        
+
         for d in rm_dirs:
             if os.path.isdir( emb_root.pjoin(d) ):
                 shutil.rmtree( emb_root.pjoin(d) )
@@ -441,7 +441,7 @@ class EmbeddedStage(stage.BaseGentooStage):
 
             kernel_link = r.pjoin('/boot/kernel')
             kernel_path = os.path.realpath( kernel_link )
-            
+
             if os.path.lexists(self.kernlinkpath):
                 os.unlink(self.kernlinkpath)
 
@@ -458,7 +458,7 @@ class EmbeddedStage(stage.BaseGentooStage):
         util.info("Created %s" % (self.cpiopath,))
         if self.conf.has('kernel'):
             util.info("Kernel located at %s" % (self.kernlinkpath,))
-    
+
     def get_tarpath(self):
         if self.tarpath:
             return self.tarpath

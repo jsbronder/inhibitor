@@ -38,7 +38,7 @@ class _GenericSource(object):
                                   returning true or false for a given path or a list of
                                   patterns to be ignored.  See shutil.ignore_patterns.
     """
-    def __init__(self, src, 
+    def __init__(self, src,
             inhibitor_state = None,
             dest            = None,
             keep            = False,
@@ -64,7 +64,7 @@ class _GenericSource(object):
         self.istate = inhibitor_state
         if self.cachedir and not self.cachedir.startswith(self.istate.paths.cache):
             self.cachedir = self.istate.paths.cache.pjoin(self.cachedir)
- 
+
     def init(self):
         raise util.InhibitorError("init() is undefined for %s" % (self.src,))
 
@@ -98,7 +98,7 @@ class _GenericSource(object):
             util.mount(self.mount, self.istate.mount_points)
         else:
             util.path_sync(
-                src, 
+                src,
                 full_dest,
                 root = root,
                 ignore = self.ignore,
@@ -208,7 +208,7 @@ class FuncSource(_GenericSource):
             f.write(line[strip:]+'\n')
         f.close()
         self.file_copy_callback(None, path)
- 
+
     def install(self, root):
         realdest = root.pjoin(self.dest)
         if not os.path.exists( os.path.dirname(realdest) ):
@@ -220,7 +220,7 @@ class FuncSource(_GenericSource):
         else:
             util.dbg("Writing dictionary output to %s" % (realdest,))
             self._write_dictionary(realdest, self.output)
-         
+
 
 class GitSource(_GenericSource):
     """
@@ -255,7 +255,7 @@ class GitSource(_GenericSource):
             cachedir        = cachedirname,
             **keywds
         )
-        
+
     def post_conf(self, inhibitor_status):
         super(GitSource, self).post_conf(inhibitor_status)
         self.gitdir = self.cachedir.pjoin('.git')
@@ -300,7 +300,7 @@ class GitSource(_GenericSource):
         _, branches = util.cmd_out('git branch -l', env=self.env, chdir=self.cachedir)
         if 'inhibitor' in branches:
             util.cmd('git branch -D inhibitor', env=self.env, chdir=self.cachedir)
-        
+
         if self.rev != 'HEAD':
             util.cmd('git checkout -b inhibitor %s' % self.rev, env=self.env, chdir=self.cachedir)
         else:
@@ -324,7 +324,7 @@ class InhibitorScript(object):
 
     def __init__(self, name, src, args = [], needs=[]):
         self.local_src = util.Path('/tmp/inhibitor/sh/').pjoin(name)
-        self.script = create_source( 
+        self.script = create_source(
             src,
             keep = False,
             dest = self.local_src )
@@ -346,7 +346,7 @@ class InhibitorScript(object):
         for req in self.reqs:
             req.post_conf(inhibitor_state)
             req.init()
-    
+
     def install(self, root):
         self.script.install(root)
         os.chmod(root.pjoin(self.local_src), 0755)

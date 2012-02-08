@@ -49,7 +49,7 @@ class InhibitorState(object):
             if not os.path.exists(path):
                 os.makedirs(path)
 
-        
+
 class Inhibitor(object):
     """
     Holding class for Actions.  Serves to run and track the state

@@ -39,7 +39,7 @@ class Path(types.StringType):
 
     def dname(self):
         """Return path as a directory, i.e. a trailing '/'"""
-        return str(self) + "/" 
+        return str(self) + "/"
 
     def pjoin(self, *paths):
         """Return a new Path by joining this one with the specified paths"""
@@ -201,7 +201,7 @@ def _kill_pids(pids, ignore_exceptions=True):
                 pass
             if not e.errno in (10, 3):
                 raise e
-    
+
 def _spawn(cmdline, env={}, return_output=False, timeout=0, exe=None, chdir=None):
     if type(cmdline) == types.StringType:
         cmdline = cmdline.split()
@@ -209,13 +209,13 @@ def _spawn(cmdline, env={}, return_output=False, timeout=0, exe=None, chdir=None
     if exe == None:
         exe = cmdline[0]
 
-    if return_output: 
+    if return_output:
         dbg("Getting output from '%s'" % ' '.join(cmdline))
         fout = tempfile.NamedTemporaryFile()
     else:
         dbg("Calling '%s'" % ' '.join(cmdline))
         fout = sys.stdout
-   
+
     try:
         child = subprocess.Popen(cmdline, shell=False, executable=exe,
             env=env, stdout=fout, stderr=subprocess.STDOUT, close_fds=True,
@@ -225,7 +225,7 @@ def _spawn(cmdline, env={}, return_output=False, timeout=0, exe=None, chdir=None
         raise
     except OSError, e:
         raise InhibitorError("Failed to spawn '%s': %s" % (cmdline, e))
-        
+
     if timeout == 0:
         try:
             ret = child.wait()
@@ -241,7 +241,7 @@ def _spawn(cmdline, env={}, return_output=False, timeout=0, exe=None, chdir=None
             ret = child.poll()
             if ret != None:
                 break
-            
+
             ctime = time.time()
             if (start_time + timeout) >= ctime:
                 _kill_pids(child.pid)
@@ -252,7 +252,7 @@ def _spawn(cmdline, env={}, return_output=False, timeout=0, exe=None, chdir=None
         fout.flush()
         fout.seek(0)
         output = fout.read()
-        ret = (ret, output) 
+        ret = (ret, output)
         fout.close()
     return ret
 
@@ -260,7 +260,7 @@ def _spawn_sh(cmdline, env, chdir=None, return_output=False, shell='/bin/bash'):
     args = [shell, '-c']
     if '|' in cmdline:
         # Make sure we get a real return value.
-        cmdline = "set -o pipefail;" + cmdline 
+        cmdline = "set -o pipefail;" + cmdline
 
     args.append(cmdline)
 
@@ -360,7 +360,7 @@ def chroot(path, function, failuref=None, fargs={}, failure_args={}):
     os.close(orig_root)
     os.chdir(orig_dir)
     return ret
- 
+
 def make_conf_dict(path):
     """
     Read a make.conf file and return it as a dictionary.
@@ -401,7 +401,7 @@ def path_sync(src, targ, root='/', ignore=lambda x, y: [], file_copy_callback=No
     @param targ                 - Destination path.
     @param root                 - Root of the target path, used to preserve non-relative
                                   symlinks.  Defaults to /.
-    @param ignore               - If a function,  given a list of files returns a list 
+    @param ignore               - If a function,  given a list of files returns a list
                                   to be ignored.  If a string, converted to a function
                                   using shutil.ignore_patterns.
     @param file_copy_callback   - After copying a file, this function will be called
@@ -433,7 +433,7 @@ def path_sync(src, targ, root='/', ignore=lambda x, y: [], file_copy_callback=No
         link = os.readlink(src)
         if not os.path.lexists( os.path.dirname(os.path.realpath(targ)) ):
             os.makedirs( os.path.dirname(os.path.realpath(targ)) )
-        
+
         if os.path.lexists(targ):
             os.unlink(targ)
         os.symlink(link, targ)
@@ -450,7 +450,7 @@ def path_sync(src, targ, root='/', ignore=lambda x, y: [], file_copy_callback=No
             link = link.lstrip('/')
             src = os.path.normpath( os.path.join( os.path.dirname(src), append, link) )
             targ = os.path.normpath( os.path.join( os.path.dirname(targ), append, link) )
-            
+
             if os.path.exists(src):
                 path_sync( src, targ,
                     ignore=ignore_func,
