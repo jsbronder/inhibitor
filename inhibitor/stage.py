@@ -441,6 +441,7 @@ class Stage4(BaseGentooStage):
         ret.append( util.Step(self.install_sources,         always=True)    )
         ret.append( util.Step(self.make_profile_link,       always=False)   )
         ret.append( util.Step(self.merge_portage,           always=False)   )
+        ret.append( util.Step(self.setup_extras,            always=False)   )
         ret.append( util.Step(self.merge_system,            always=False)   )
         ret.append( util.Step(self.merge_packages,          always=False)   )
         if self.kernel:
@@ -456,6 +457,17 @@ class Stage4(BaseGentooStage):
 
     def merge_portage(self):
         self._emerge('sys-apps/portage', flags='--oneshot --newuse')
+
+    def setup_extras(self):
+        util.chroot(
+            path = self.target_root,
+            function = util.cmd,
+            fargs = {
+                'cmdline': '%s/inhibitor-run.sh setup_extras' % ( self.env['INHIBITOR_SCRIPT_ROOT'], ),
+                'env':      self.env,
+            },
+            failuref = self.chroot_failure,
+        )
 
     def merge_system(self):
         self._emerge('system', flags='--deep --newuse --update')

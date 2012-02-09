@@ -105,3 +105,10 @@ get_root() {
     emerge --verbose --info 2>/dev/null | egrep '^ROOT=' | sed 's,ROOT="\([^"]*\)",\1,'
 }
 
+setup_extras() {
+    [ -x /usr/bin/portageq ] || return 0
+
+    if portageq envvar FEATURES | grep ccache >/dev/null; then
+        run_emerge -1 dev-util/ccache
+    fi
+}
