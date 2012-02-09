@@ -122,14 +122,14 @@ class FileSource(_GenericSource):
                                   returning true or false for a given path or a list of
                                   patterns to be ignored.  See shutil.ignore_patterns.
     """
-    def __init__(self, src, inhibitor_state = None, dest = None, keep = False, **keywds):
+    def __init__(self, src, inhibitor_state = None, dest = None, keep = False, mountable=None, **keywds):
         real_src    = util.Path(src[6:])
-        mountable   = False
 
         if not os.path.lexists(real_src):
             raise util.InhibitorError("Path %s does not exist" % real_src)
-        elif os.path.isdir(real_src):
-            mountable = True
+
+        if mountable == None:
+            mountable = True if os.path.isdir(real_src) else False
 
         super(FileSource, self).__init__(
             src             = real_src,
