@@ -4,6 +4,7 @@ import glob
 import re
 import shutil
 import tarfile
+import types
 
 import actions
 import source
@@ -48,8 +49,11 @@ class BaseStage(actions.InhibitorAction):
         @param name         -
         @param seed         - Name of the seed stage to use for building.  Stage
                               needs to be located in inhibitor's stagedir.
-        @param fs_overlay   - InhibitorSource of files to be added to the stage.
-                              The files are added during install_sources().
+        @param fs_sources   - List of InhibitorSources to be added to the stage.  The
+                              sources are added during install_sources().  If
+                              source.keep is set, the source will persist in the file
+                              stage image, otherwise it is removed during
+                              remove_sources().
 
     """
     def __init__(self, stage_conf, build_name, stage_name='base_stage', **keywds):
@@ -60,7 +64,7 @@ class BaseStage(actions.InhibitorAction):
         self.target_root    = None
         self.tarpath        = None
         self.seed           = None
-        self.fs_overlay     = None
+        self.fs_sources     = None
         self.aux_mounts     = {}
         self.aux_sources    = {}
         self.root           = util.Path('/')
@@ -113,11 +117,18 @@ class BaseStage(actions.InhibitorAction):
                 )
             self.sources.append(j)
 
-        if self.conf.has('fs_overlay'):
-            self.fs_overlay = self.conf.fs_overlay
-            self.fs_overlay.keep = True
-            self.fs_overlay.dest = util.Path('/')
-            self.sources.append(self.fs_overlay)
+        if self.conf.has('fs_sources'):
+            if not type(self.conf.fs_sources) in (types.ListType, types.TupleType):
+                self.conf.fs_sources = [self.conf.fs_sources]
+
+            for src in self.conf.fs_sources:
+                if not src.dest:
+                    util.warn("Setting dest for %s to '/'" % (src.src,))
+                    src.dest = util.Path('/')
+                if src.mountable and src.dest == util.Path('/'):
+                    util.warn("Setting mountable=False on %s" % (src.src,))
+                    src.mountable = False
+                self.sources.append(src)
 
     def post_conf_finish(self):
         for src in self.sources:
@@ -160,10 +171,10 @@ class BaseStage(actions.InhibitorAction):
             self.aux_sources[m].install( root = self.target_root )
 
     def remove_sources(self):
-        if self.fs_overlay:
-            # Previous actions may have overwritten the fs_overlay, so
+        for src in [x for x in self.sources if (x.keep and not x.mountable)]:
+            # Previous actions may have overwritten the source, so
             # it needs to be reinstalled one last time.
-            self.fs_overlay.install( root = self.target_root )
+            src.install( root = self.target_root )
 
         for src in self.sources:
             src.remove()
