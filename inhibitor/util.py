@@ -161,6 +161,7 @@ def umount(mp, mounts):
                 # Catch the process having already exited.
                 if e.errno == 2:
                     continue
+                raise
         _kill_pids(pl)
 
         if cmd('umount -f %s' % fp, raise_exception=False) != 0:
