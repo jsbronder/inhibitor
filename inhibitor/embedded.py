@@ -394,7 +394,7 @@ class EmbeddedStage(stage.BaseGentooStage):
                 util.chroot(
                     path        = self.target_root,
                     function    = util.cmd,
-                    fargs       = {'cmdline': 'rsync -av --delete-after %s %s/' % (
+                    fargs       = {'cmdline': 'rsync -a --delete-after %s %s/' % (
                                         '/tmp/inhibitor/kernelbuild/lib/%s' % (d,),
                                         self.target_root.pjoin('lib'))},
                     failuref    = self.chroot_failure,
