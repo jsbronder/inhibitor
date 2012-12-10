@@ -388,8 +388,26 @@ class EmbeddedStage(stage.BaseGentooStage):
                 fargs       = {'cmdline':cmdline, 'env':env},
                 failuref    = self.chroot_failure,
             )
+
+            # Grab any modules or firmware and put them into the embedded root fs.
+            for d in ('modules', 'firmware'):
+                util.chroot(
+                    path        = self.target_root,
+                    function    = util.cmd,
+                    fargs       = {'cmdline': 'rsync -av --delete-after %s %s/' % (
+                                        '/tmp/inhibitor/kernelbuild/lib/%s' % (d,),
+                                        self.target_root.pjoin('lib'))},
+                    failuref    = self.chroot_failure,
+                )
+
         else:
             util.cmd( cmdline, env )
+
+            # Grab any modules or firmware and put them into the embedded root fs.
+            for d in ('modules', 'firmware'):
+                util.cmd('rsync -a --delete-after %s %s/' % (
+                    '/tmp/inhibitor/kernelbuild/lib/%s' % (d,),
+                    self.target_root.pjoin('lib')))
 
     def remove_sources(self):
         super(EmbeddedStage, self).remove_sources()
