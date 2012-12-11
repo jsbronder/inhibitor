@@ -1,0 +1,11 @@
+#!/bin/sh /etc/rc-functions.sh
+START=03
+
+start () {
+    local m
+    depmod -a
+
+    for m in $(find /sys/devices/ -name modalias -exec cat {} +); do
+        modprobe ${m} >/dev/null 2>/dev/null
+    done
+}
